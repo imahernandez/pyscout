@@ -368,7 +368,10 @@ class AdjustScreen(QWidget):
         self._sync_clips()
 
     def keyPressEvent(self, e):
-        if e.key() == Qt.Key.Key_3:
+        if e.key() == Qt.Key.Key_Space:
+            self._video.toggle_play()
+            e.accept()
+        elif e.key() == Qt.Key.Key_3:
             self._add_to_presentation()
         else:
             super().keyPressEvent(e)
@@ -491,10 +494,12 @@ class AdjustScreen(QWidget):
         if self._selected_clip and self._selected_clip.id not in {c.id for c in state.clips}:
             self._selected_clip = None
             self._loaded_video_path = ""
-            try:
-                self._video.file_loaded.disconnect()
-            except (RuntimeError, TypeError):
-                pass
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                try:
+                    self._video.file_loaded.disconnect()
+                except Exception:
+                    pass
             self._video.pause()
             self._edit.hide()
             self._empty.show()
@@ -611,11 +616,12 @@ class AdjustScreen(QWidget):
             self._video.seek(clip.time_sec)
 
     def _do_seek(self, sec: float):
-        try:
-            self._video.file_loaded.disconnect()
-        except (RuntimeError, TypeError):
-            # TypeError: señal no conectada, RuntimeError: widget destruido
-            pass
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            try:
+                self._video.file_loaded.disconnect()
+            except Exception:
+                pass
         self._video.seek(sec)
 
     # ── Controles ─────────────────────────────────────────────────────────────

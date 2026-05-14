@@ -212,11 +212,6 @@ class MainWindow(QMainWindow):
         self._act_mute_all.triggered.connect(self._toggle_mute_all)
         m_opciones.addAction(self._act_mute_all)
 
-        self._act_mute_export = QAction(_("Silenciar video final por defecto"), self)
-        self._act_mute_export.setCheckable(True)
-        self._act_mute_export.setChecked(False)
-        m_opciones.addAction(self._act_mute_export)
-        m_opciones.addSeparator()
         m_opciones.addSeparator()
 
         m_lang = m_opciones.addMenu(_("Idioma"))
@@ -333,6 +328,18 @@ class MainWindow(QMainWindow):
         self._redo_btn.setEnabled(can_redo)
 
     def _switch_screen(self, idx):
+        # Pausar el player de la pantalla que se abandona para liberar el
+        # slot de hardware decoding (evita interferencia entre instancias mpv)
+        prev = self._stack.currentIndex()
+        if prev != idx:
+            from components.video_player import MpvWidget
+            leaving = self._stack.widget(prev)
+            for mpv_w in leaving.findChildren(MpvWidget):
+                try:
+                    if not mpv_w._paused:
+                        mpv_w.pause()
+                except Exception:
+                    pass
         self._stack.setCurrentIndex(idx)
         for i, btn in enumerate(self._tabs):
             btn.setObjectName("tab_active" if i == idx else "tab")
@@ -436,7 +443,7 @@ class MainWindow(QMainWindow):
         self._autosave_path = ""
 
     def _save_project_as(self):
-        path, _ = QFileDialog.getSaveFileName(self, _("Guardar proyecto"),
+        path, _filt = QFileDialog.getSaveFileName(self, _("Guardar proyecto"),
             os.path.join(_docs_folder("Proyectos"), f"{state.project_name}.scout"),
             filter="Scout Project (*.scout)")
         if not path: return
@@ -449,7 +456,7 @@ class MainWindow(QMainWindow):
             state.toast_requested.emit(_('"{}" guardado').format(name))
 
     def _load_project(self):
-        path, _ = QFileDialog.getOpenFileName(self, _("Abrir proyecto"),
+        path, _filt = QFileDialog.getOpenFileName(self, _("Abrir proyecto"),
             _docs_folder("Proyectos"), filter="Scout Project (*.scout)")
         if not path: return
         self._load_project_path(path)
@@ -524,7 +531,7 @@ class MainWindow(QMainWindow):
         state.toast_requested.emit(_("Botonera vacía"))
 
     def _save_buttons(self):
-        path, _ = QFileDialog.getSaveFileName(self, _("Guardar botonera"),
+        path, _filt = QFileDialog.getSaveFileName(self, _("Guardar botonera"),
             os.path.join(_docs_folder("Botoneras"), "botonera.scoutbtn"),
             filter="Scout Botonera (*.scoutbtn)")
         if not path: return
@@ -541,7 +548,7 @@ class MainWindow(QMainWindow):
             state.toast_requested.emit(f"Error: {e}")
 
     def _load_buttons(self):
-        path, _ = QFileDialog.getOpenFileName(self, _("Abrir botonera"),
+        path, _filt = QFileDialog.getOpenFileName(self, _("Abrir botonera"),
             _docs_folder("Botoneras"),
             filter="Scout Botonera (*.scoutbtn);;JSON (*.json)")
         if not path: return
@@ -1160,25 +1167,53 @@ class MainWindow(QMainWindow):
 
     def _rebuild_screens(self):
         current_idx = self._stack.currentIndex()
+
+        # Guardar fuentes activas para restaurar después
+        active_path = state.active_video_path
+        active_name = state.active_video_name
+
+        # Parar timers y desconectar players ANTES de destruir widgets
         from components.video_player import MpvWidget
         for screen_idx in range(self._stack.count()):
             screen = self._stack.widget(screen_idx)
             for mpv_w in screen.findChildren(MpvWidget):
-                try: mpv_w._ui_timer.stop()
-                except Exception: pass
                 try:
-                    if mpv_w._player:
+                    if hasattr(mpv_w, '_ui_timer') and mpv_w._ui_timer:
+                        mpv_w._ui_timer.stop()
+                except Exception:
+                    pass
+                try:
+                    if getattr(mpv_w, '_player', None):
                         mpv_w._player.pause = True
                         mpv_w._player.command("stop")
+                except Exception:
+                    pass
+
+        # Procesar eventos pendientes para que los callbacks de mpv drenen
+        QApplication.processEvents()
+        QApplication.processEvents()
+
+        # Terminar los players ya silenciados
+        for screen_idx in range(self._stack.count()):
+            screen = self._stack.widget(screen_idx)
+            for mpv_w in screen.findChildren(MpvWidget):
+                try:
+                    if getattr(mpv_w, '_player', None):
                         mpv_w._player.terminate()
                         mpv_w._player = None
-                except Exception: pass
-        import time; time.sleep(0.15)
+                except Exception:
+                    pass
+
         QApplication.processEvents()
+
         while self._stack.count():
             w = self._stack.widget(0)
-            self._stack.removeWidget(w); w.setParent(None); w.deleteLater()
+            self._stack.removeWidget(w)
+            w.setParent(None)
+            w.deleteLater()
+
         QApplication.processEvents()
+
         self._obs_screen = ObservationScreen()
         self._adj_screen = AdjustScreen()
         self._pres_screen = PresentationScreen()
@@ -1187,8 +1222,15 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._adj_screen)
         self._stack.addWidget(self._pres_screen)
         self._stack.setCurrentIndex(current_idx)
-        state.buttons_changed.emit(); state.clips_changed.emit()
-        state.presentation_changed.emit(); state.sources_changed.emit()
+
+        state.buttons_changed.emit()
+        state.clips_changed.emit()
+        state.presentation_changed.emit()
+        state.sources_changed.emit()
+
+        # Restaurar el video activo si había uno cargado
+        if active_path:
+            state.active_source_changed.emit(active_path, active_name)
 
     def resizeEvent(self, e):
         super().resizeEvent(e)

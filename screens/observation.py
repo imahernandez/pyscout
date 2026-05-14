@@ -268,6 +268,8 @@ class ObservationScreen(QWidget):
             _("Creá tu primer botón\ncon el  +  de arriba"),
             fs(11)
         )
+        self._btn_empty.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_empty.mousePressEvent = lambda e: self._show_add_modal()
         self._btn_layout.insertWidget(0, self._btn_empty)
 
         # left se agrega al splitter más abajo
@@ -646,7 +648,7 @@ class ObservationScreen(QWidget):
     # ── Video ─────────────────────────────────────────────────────────────────
 
     def _open_video(self):
-        paths, _ = QFileDialog.getOpenFileNames(
+        paths, _filt = QFileDialog.getOpenFileNames(
             self, _("Agregar video fuente"),
             filter="Video (*.mp4 *.mov *.avi *.mkv *.webm *.m4v *.mts)")
         for path in paths:
@@ -743,8 +745,8 @@ class ObservationScreen(QWidget):
         count_lbl.setFixedHeight(34)
         count_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         count_lbl.setStyleSheet(
-            f"background:{BG1}; color:{TEXT3};"
-            f" border:none; font-size:{fs(10)}px; font-weight:600;"
+            f"background:{BG1}; color:{TEXT2};"
+            f" border:none; font-size:{fs(12)}px; font-weight:600;"
             f" letter-spacing:0.5px;"
         )
 
@@ -762,13 +764,13 @@ class ObservationScreen(QWidget):
             _hlo.setContentsMargins(0, 0, 4, 0)
             _hlo.setAlignment(Qt.AlignmentFlag.AlignCenter)
             _hk = QLabel(hk.upper())
-            _hk.setFixedSize(17, 13)
+            _hk.setFixedSize(21, 15)
             _hk.setAlignment(Qt.AlignmentFlag.AlignCenter)
             _hk.setStyleSheet(
                 f"background:{BG3}; color:{TEXT1};"
                 f" border:1px solid rgba(255,252,248,0.12);"
                 f" border-radius:3px;"
-                f" font-size:{fs(8)}px; font-weight:700;"
+                f" font-size:{fs(10)}px; font-weight:700;"
                 f" font-family:'Courier New',monospace;"
             )
             _hlo.addWidget(_hk)
@@ -1334,8 +1336,9 @@ class ButtonConfigDialog(QDialog):
 
     def eventFilter(self, obj, event):
         from PySide6.QtCore import QEvent
+        from PySide6.QtWidgets import QWidget
         if event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease, QEvent.Type.ShortcutOverride):
-            if obj is not self and not self.isAncestorOf(obj):
+            if obj is not self and (not isinstance(obj, QWidget) or not self.isAncestorOf(obj)):
                 return True
         return False
 

@@ -643,7 +643,7 @@ class StartDialog(QDialog):
 
     def _action_open(self):
         if not self._guard_license(): return
-        path, _ = QFileDialog.getOpenFileName(self, _("Abrir proyecto"), "",
+        path, _filt = QFileDialog.getOpenFileName(self, _("Abrir proyecto"), "",
             "PyScout Project (*.scproj);;Scout Project (*.scout);;All (*)")
         if path:
             self.selected_project_path = path

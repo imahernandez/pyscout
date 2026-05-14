@@ -46,6 +46,11 @@ class MpvWidget(QWidget):
         self._last_emitted_pos = -1.0
         self._player    = None
         self._ui_timer  = None
+        self._pending_seek: float | None = None
+        self._seek_timer = QTimer(self)
+        self._seek_timer.setSingleShot(True)
+        self._seek_timer.setInterval(40)  # max 25 seeks/seg
+        self._seek_timer.timeout.connect(self._flush_seek)
 
         if mpv is None:
             print(f"[MpvWidget] libmpv no disponible")
@@ -59,10 +64,10 @@ class MpvWidget(QWidget):
             ]
         else:
             _configs = [
-                dict(vo="gpu-next", hwdec="auto-safe", gpu_api="d3d11"),
                 dict(vo="gpu",      hwdec="auto-safe"),
                 dict(vo="gpu",      hwdec="no"),
                 dict(vo="direct3d", hwdec="no"),
+                dict(vo="gpu-next", hwdec="auto-safe", gpu_api="d3d11"),
             ]
 
         for cfg in _configs:
@@ -179,16 +184,24 @@ class MpvWidget(QWidget):
         return self._paused
 
     def seek(self, seconds: float):
-        """Seek frame-exact."""
+        """Seek con debounce de 40ms — evita saturar el event loop de mpv."""
         if not self._player:
             return
+        t = max(0.0, seconds)
+        if self._duration > 0:
+            t = min(t, self._duration - 0.05)
+        self._pending_seek = t
+        if not self._seek_timer.isActive():
+            self._seek_timer.start()
+
+    def _flush_seek(self):
+        if self._pending_seek is None or not self._player:
+            return
         try:
-            t = max(0.0, seconds)
-            if self._duration > 0:
-                t = min(t, self._duration - 0.05)
-            self._player.seek(t, "absolute+exact")
+            self._player.seek(self._pending_seek, "absolute+exact")
         except Exception:
             pass
+        self._pending_seek = None
 
     def seek_relative(self, delta: float):
         if not self._player:
