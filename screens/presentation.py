@@ -3,13 +3,14 @@ from PySide6.QtWidgets import (
     QScrollArea, QFrame, QProgressBar, QComboBox, QSizePolicy,
     QFileDialog, QDialog, QApplication, QSpinBox, QCheckBox,
     QRadioButton, QButtonGroup, QGraphicsOpacityEffect, QLineEdit,
-    QMenu
+    QMenu, QSlider
 )
-from PySide6.QtCore import Qt, QThread, Signal, QMimeData, QPoint, QSize
+from PySide6.QtCore import Qt, QThread, Signal, QMimeData, QPoint, QSize, QTimer
 from PySide6.QtGui import QPixmap, QDrag, QColor, QImage, QPainter, QPen
 import os
 import subprocess
 import platform
+import warnings
 
 from store.state import state, PresentationItem
 from styles.theme import fs
@@ -19,6 +20,7 @@ from utils.theme_helpers import (
     CLIP_COLORS, FONT
 )
 from utils.time_utils import fmt_time, fmt_dur
+from utils.i18n import _
 from utils.ffmpeg import render_presentation
 from components.video_player import MpvWidget
 from icons_helper import (
@@ -66,11 +68,11 @@ class RenderThread(QThread):
                 progress_cb=progress_with_cancel)
 
             if self._cancelled:
-                self.finished.emit(False, "Cancelado")
+                self.finished.emit(False, _("Cancelado"))
             else:
                 self.finished.emit(True, self.output_path)
         except InterruptedError:
-            self.finished.emit(False, "Cancelado")
+            self.finished.emit(False, _("Cancelado"))
         except Exception as e:
             self.finished.emit(False, str(e)[:400])
 
@@ -82,7 +84,7 @@ class RenderProgressDialog(QDialog):
 
     def __init__(self, total_dur: float, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Produciendo presentación...")
+        self.setWindowTitle(_("Produciendo presentación..."))
         self.setFixedWidth(420)
         self.setModal(True)
         self.setStyleSheet(f"background:{BG1};")
@@ -95,7 +97,7 @@ class RenderProgressDialog(QDialog):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(14)
 
-        title = QLabel("Procesando video...")
+        title = QLabel(_("Procesando video..."))
         title.setStyleSheet(f"color:{TEXT0}; font-size:{fs(14)}px; font-weight:600;")
         layout.addWidget(title)
 
@@ -115,7 +117,7 @@ class RenderProgressDialog(QDialog):
         info_row.addWidget(self._time_lbl)
         layout.addLayout(info_row)
 
-        self._eta_lbl = QLabel("Calculando tiempo restante...")
+        self._eta_lbl = QLabel(_("Calculando tiempo restante..."))
         self._eta_lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(11)}px;")
         layout.addWidget(self._eta_lbl)
 
@@ -123,7 +125,7 @@ class RenderProgressDialog(QDialog):
         sep.setStyleSheet(f"background:rgba(255,255,255,0.06);")
         layout.addWidget(sep)
 
-        self._cancel_btn = QPushButton("Cancelar")
+        self._cancel_btn = QPushButton(_("Cancelar"))
         self._cancel_btn.setStyleSheet(f"""
             QPushButton {{ background:transparent; color:{DANGER};
                 border:1px solid {DANGER}; border-radius:0; padding:6px 16px; font-size:{fs(12)}px; }}
@@ -138,7 +140,7 @@ class RenderProgressDialog(QDialog):
         comp_layout.setContentsMargins(0, 0, 0, 0)
         comp_layout.setSpacing(8)
         
-        self._open_folder_btn = QPushButton("Abrir carpeta")
+        self._open_folder_btn = QPushButton(_("Abrir carpeta"))
         self._open_folder_btn.setStyleSheet(f"""
             QPushButton {{ background:{ACCENT}; color:#1a1714;
                 border:none; border-radius:4px; padding:8px 20px; font-size:{fs(13)}px; font-weight:600; }}
@@ -147,7 +149,7 @@ class RenderProgressDialog(QDialog):
         self._open_folder_btn.clicked.connect(self._open_folder)
         comp_layout.addWidget(self._open_folder_btn)
         
-        self._close_btn = QPushButton("Cerrar")
+        self._close_btn = QPushButton(_("Cerrar"))
         self._close_btn.setStyleSheet(f"""
             QPushButton {{ background:transparent; color:{TEXT0};
                 border:1px solid {BORDER2}; border-radius:4px; padding:8px 20px; font-size:{fs(13)}px; }}
@@ -189,13 +191,13 @@ class RenderProgressDialog(QDialog):
             speed = done_sec / elapsed
             eta_sec = (self._total_dur - done_sec) / speed
             em = int(eta_sec // 60); es = int(eta_sec % 60)
-            self._eta_lbl.setText(f"Tiempo restante: {em}m {es}s")
+            self._eta_lbl.setText(_("Tiempo restante: {}m {}s").format(em, es))
 
     def mark_done(self):
         """Marcar como completado y mostrar botones finales."""
         self._progress_bar.setValue(100)
         self._pct_lbl.setText("100%")
-        self._eta_lbl.setText("✓ Película creada exitosamente")
+        self._eta_lbl.setText(_("✓ Película creada exitosamente"))
         self._eta_lbl.setStyleSheet(f"color:{ACCENT}; font-size:{fs(13)}px; font-weight:600;")
         
         # Ocultar botón cancelar, mostrar botones finales
@@ -238,7 +240,7 @@ class RenderSettingsDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Configuración de exportación")
+        self.setWindowTitle(_("Configuración de exportación"))
         self.setFixedWidth(420)
         self.setModal(True)
         self.setStyleSheet(f"background:{BG1};")
@@ -254,12 +256,12 @@ class RenderSettingsDialog(QDialog):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(10)
 
-        title = QLabel("Crear película")
+        title = QLabel(_("Crear película"))
         title.setStyleSheet(f"color:{TEXT0}; font-size:{fs(16)}px; font-weight:600;")
         layout.addWidget(title)
 
         # Calidad
-        q_lbl = QLabel("CALIDAD")
+        q_lbl = QLabel(_("CALIDAD"))
         q_lbl.setStyleSheet(f"color:{ACCENT}; font-size:{fs(9)}px; font-weight:700; letter-spacing:1.5px;")
         layout.addWidget(q_lbl)
 
@@ -271,7 +273,7 @@ class RenderSettingsDialog(QDialog):
             rl = QVBoxLayout(row)
             rl.setContentsMargins(0, 2, 0, 2)
             rl.setSpacing(1)
-            rb = QRadioButton(label)
+            rb = QRadioButton(_(label))
             rb.setStyleSheet(f"color:{TEXT0}; font-size:{fs(12)}px;")
             rb.setProperty("crf", info["crf"])
             rb.setProperty("fps", info["fps"])
@@ -290,23 +292,23 @@ class RenderSettingsDialog(QDialog):
         layout.addWidget(sep1)
 
         # Overlay y Transición
-        o_lbl = QLabel("OPCIONES DE VIDEO")
+        o_lbl = QLabel(_("OPCIONES DE VIDEO"))
         o_lbl.setStyleSheet(f"color:{ACCENT}; font-size:{fs(9)}px; font-weight:700; letter-spacing:1.5px;")
         layout.addWidget(o_lbl)
         
         # Mostrar nombre del clip
-        self._overlay_cb = QCheckBox("Mostrar nombre del clip en el video")
+        self._overlay_cb = QCheckBox(_("Mostrar nombre del clip en el video"))
         self._overlay_cb.setStyleSheet(f"color:{TEXT1}; font-size:{fs(12)}px;")
         self._overlay_cb.setChecked(False)
         layout.addWidget(self._overlay_cb)
         
         # Transición
-        trans_lbl = QLabel("Transición entre clips:")
+        trans_lbl = QLabel(_("Transición entre clips:"))
         trans_lbl.setStyleSheet(f"color:{TEXT2}; font-size:{fs(11)}px; margin-top:8px;")
         layout.addWidget(trans_lbl)
         
         self._trans_combo = QComboBox()
-        self._trans_combo.addItems(["Corte directo", "Fade negro (0.5s)", "Fade negro (1s)"])
+        self._trans_combo.addItems([_("Corte directo"), _("Fade negro (0.5s)"), _("Fade negro (1s)")])
         self._trans_combo.setStyleSheet(f"""
             QComboBox {{
                 background:{BG2}; color:{TEXT0}; border:1px solid {BORDER2};
@@ -323,19 +325,19 @@ class RenderSettingsDialog(QDialog):
         layout.addWidget(sep2)
         
         # Audio
-        a_lbl = QLabel("OPCIONES DE AUDIO")
+        a_lbl = QLabel(_("OPCIONES DE AUDIO"))
         a_lbl.setStyleSheet(f"color:{ACCENT}; font-size:{fs(9)}px; font-weight:700; letter-spacing:1.5px;")
         layout.addWidget(a_lbl)
 
-        self._mute_cb = QCheckBox("Silenciar audio")
+        self._mute_cb = QCheckBox(_("Silenciar audio"))
         self._mute_cb.setStyleSheet(f"color:{TEXT1}; font-size:{fs(12)}px;")
         layout.addWidget(self._mute_cb)
 
-        self._separate_cb = QCheckBox("Crear archivos separados")
+        self._separate_cb = QCheckBox(_("Crear archivos separados"))
         self._separate_cb.setStyleSheet(f"color:{TEXT1}; font-size:{fs(12)}px;")
         layout.addWidget(self._separate_cb)
 
-        sep_hint = QLabel("Cada registro se exporta como un MP4 individual")
+        sep_hint = QLabel(_("Cada registro se exporta como un MP4 individual"))
         sep_hint.setStyleSheet(f"color:{TEXT3}; font-size:{fs(10)}px; padding-left:22px;")
         layout.addWidget(sep_hint)
 
@@ -347,7 +349,7 @@ class RenderSettingsDialog(QDialog):
         # Botones
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        cancel_btn = QPushButton("Cancelar")
+        cancel_btn = QPushButton(_("Cancelar"))
         cancel_btn.setStyleSheet(f"""
             QPushButton {{ background:transparent; color:{TEXT2};
                 border:1px solid {BORDER2}; padding:6px 16px; font-size:{fs(12)}px; }}
@@ -356,7 +358,7 @@ class RenderSettingsDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(cancel_btn)
 
-        ok_btn = QPushButton("Exportar")
+        ok_btn = QPushButton(_("Exportar"))
         ok_btn.setStyleSheet(f"""
             QPushButton {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
                 stop:0 {ACCENT3},stop:1 {ACCENT}); color:#1a1714;
@@ -500,7 +502,7 @@ class ClipDetailDialog(QDialog):
                         Qt.TransformationMode.SmoothTransformation))
                 layout.addWidget(img_lbl, stretch=1)
         else:
-            lbl = QLabel("Vista previa no disponible")
+            lbl = QLabel(_("Vista previa no disponible"))
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(13)}px;")
             layout.addWidget(lbl, stretch=1)
@@ -517,7 +519,7 @@ class ClipDetailDialog(QDialog):
         cl.setSpacing(12)
 
         # BOTÓN ANTERIOR - destacado
-        prev_btn = QPushButton(" Anterior")
+        prev_btn = QPushButton(_(" Anterior"))
         prev_btn.setIcon(previous_icon(size=(16, 16), color=TEXT0))
         prev_btn.setIconSize(QSize(16, 16))
         prev_btn.setFixedSize(110, 40)
@@ -559,7 +561,7 @@ class ClipDetailDialog(QDialog):
         cl.addWidget(self._play_btn)
 
         # BOTÓN SIGUIENTE - destacado
-        next_btn = QPushButton("Siguiente ")
+        next_btn = QPushButton(_("Siguiente "))
         next_btn.setIcon(next_icon(size=(16, 16), color=TEXT0))
         next_btn.setIconSize(QSize(16, 16))
         next_btn.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
@@ -643,7 +645,7 @@ class ClipDetailDialog(QDialog):
         self._fullscreen_btn.setIcon(fullscreen_icon(size=(20, 20), color=TEXT2))
         self._fullscreen_btn.setIconSize(QSize(20, 20))
         self._fullscreen_btn.setFixedSize(36, 36)  # Botón compacto
-        self._fullscreen_btn.setToolTip("Modo pantalla completa")
+        self._fullscreen_btn.setToolTip(_("Modo pantalla completa"))
         self._fullscreen_btn.setStyleSheet(f"""
             QPushButton {{ 
                 background: transparent; 
@@ -728,7 +730,7 @@ class ClipDetailDialog(QDialog):
                 border-bottom: 1px solid {ACCENT};
             }}
         """)
-        self._note_edit.setPlaceholderText("Notas...")
+        self._note_edit.setPlaceholderText(_("Notas..."))
         self._note_edit.textChanged.connect(self._save_note)
         il.addWidget(self._note_edit, stretch=1)  # Ocupa el resto del espacio
 
@@ -744,7 +746,7 @@ class ClipDetailDialog(QDialog):
         tl.setContentsMargins(16, 0, 16, 0)
         tl.setSpacing(8)
 
-        tl.addWidget(QLabel("Color:", styleSheet=f"color:{TEXT2}; font-size:{fs(10)}px;"))
+        tl.addWidget(QLabel(_("Color:"), styleSheet=f"color:{TEXT2}; font-size:{fs(10)}px;"))
         self._color_btns = []
         for c in self.PALETTE:
             cb = QPushButton()
@@ -759,7 +761,7 @@ class ClipDetailDialog(QDialog):
 
         # Visibility toggle
         self._vis_state = item.visible
-        self._vis_btn = QPushButton(" Visible" if self._vis_state else " Oculto")
+        self._vis_btn = QPushButton(_(" Visible") if self._vis_state else _(" Oculto"))
         self._vis_btn.setIcon(eye_icon(size=(16, 16), color=TEXT2) if self._vis_state else eye_off_icon(size=(16, 16), color=DANGER))
         self._vis_btn.setIconSize(QSize(16, 16))
         self._vis_btn.setStyleSheet(
@@ -771,7 +773,7 @@ class ClipDetailDialog(QDialog):
         self._vis_btn.clicked.connect(self._toggle_visibility)
         tl.addWidget(self._vis_btn)
 
-        del_btn = QPushButton("Eliminar")
+        del_btn = QPushButton(_("Eliminar"))
         del_btn.setStyleSheet(f"""
             QPushButton {{ background:transparent; color:{DANGER}; border:none;
                 border-bottom:1px solid {DANGER}; font-size:{fs(11)}px; padding:3px 8px; }}
@@ -792,7 +794,7 @@ class ClipDetailDialog(QDialog):
         
         footer_layout.addStretch()  # Empujar botón a la derecha
         
-        exit_btn = QPushButton("Salir")
+        exit_btn = QPushButton(_("Salir"))
         exit_btn.setFixedHeight(24)  # 50% del original (era 32)
         exit_btn.setStyleSheet(f"""
             QPushButton {{
@@ -954,7 +956,7 @@ class ClipDetailDialog(QDialog):
         """Recargar el diálogo con un nuevo clip."""
         # Mostrar indicador de carga
         if hasattr(self, '_title_lbl'):
-            self._title_lbl.setText("Cargando...")
+            self._title_lbl.setText(_("Cargando..."))
         
         # Limpiar video anterior si existe
         if self._video_widget and self._mpv_player:
@@ -983,7 +985,7 @@ class ClipDetailDialog(QDialog):
         if hasattr(self, '_vis_btn'):
             self._vis_state = item.visible
             self._vis_btn.setIcon(eye_icon(size=(16, 16), color=TEXT2) if item.visible else eye_off_icon(size=(16, 16), color=DANGER))
-            self._vis_btn.setText(" Visible" if item.visible else " Oculto")
+            self._vis_btn.setText(_(" Visible") if item.visible else _(" Oculto"))
         
         # Actualizar colores
         if hasattr(self, '_color_btns'):
@@ -1013,17 +1015,20 @@ class ClipDetailDialog(QDialog):
                     pass
             
             # Reconectar señal de carga
-            try:
-                self._video_widget.file_loaded.disconnect()
-            except (RuntimeError, TypeError):
-                pass
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                try:
+                    self._video_widget.file_loaded.disconnect()
+                except Exception:
+                    pass
             self._video_widget.file_loaded.connect(on_loaded)
 
     # ── Color / name / delete ─────────────────────────────────────────────────
 
     def _swatch_style(self, color, active):
+        safe = color if color else "#808080"
         border = f"2px solid {TEXT0}" if active else "1px solid rgba(255,255,255,0.15)"
-        return (f"QPushButton {{ background:{color}; border:{border}; border-radius:2px; }}"
+        return (f"QPushButton {{ background:{safe}; border:{border}; border-radius:2px; }}"
                 f"QPushButton:hover {{ border:2px solid {ACCENT}; }}")
 
     def _set_color(self, color):
@@ -1036,7 +1041,7 @@ class ClipDetailDialog(QDialog):
         self._vis_state = not self._vis_state
         self._item.visible = self._vis_state
         self._vis_btn.setIcon(eye_icon(size=(16, 16), color=TEXT2) if self._vis_state else eye_off_icon(size=(16, 16), color=DANGER))
-        self._vis_btn.setText(" Visible" if self._vis_state else " Oculto")
+        self._vis_btn.setText(_(" Visible") if self._vis_state else _(" Oculto"))
         state.presentation_changed.emit()
 
     def _save_name(self):
@@ -1102,7 +1107,7 @@ class ClipDetailDialog(QDialog):
         prev_btn.setIcon(previous_icon(size=(20, 20), color=TEXT0))
         prev_btn.setIconSize(QSize(20, 20))
         prev_btn.setFixedSize(44, 44)
-        prev_btn.setToolTip("Anterior (←)")
+        prev_btn.setToolTip(_("Anterior (←)"))
         prev_btn.setStyleSheet(f"""
             QPushButton {{ 
                 background: rgba(255,255,255,0.08);
@@ -1147,7 +1152,7 @@ class ClipDetailDialog(QDialog):
         next_btn.setIcon(next_icon(size=(20, 20), color=TEXT0))
         next_btn.setIconSize(QSize(20, 20))
         next_btn.setFixedSize(44, 44)
-        next_btn.setToolTip("Siguiente (→)")
+        next_btn.setToolTip(_("Siguiente (→)"))
         next_btn.setStyleSheet(f"""
             QPushButton {{ 
                 background: rgba(255,255,255,0.08);
@@ -1202,11 +1207,11 @@ class ClipDetailDialog(QDialog):
         fs_lo.addSpacing(24)
         
         # VISIBILIDAD (texto en lugar de emoji)
-        vis_text = "Visible" if self._item.visible else "Oculto"
+        vis_text = _("Visible") if self._item.visible else _("Oculto")
         vis_btn = QPushButton(vis_text)
         vis_btn.setFixedHeight(44)
         vis_btn.setMinimumWidth(80)
-        vis_btn.setToolTip("Alternar visibilidad")
+        vis_btn.setToolTip(_("Alternar visibilidad"))
         vis_color = ACCENT if self._item.visible else DANGER
         vis_btn.setStyleSheet(f"""
             QPushButton {{ 
@@ -1231,7 +1236,7 @@ class ClipDetailDialog(QDialog):
         exit_fs_btn.setIcon(fullscreen_exit_icon(size=(22, 22), color="#FFFFFF"))
         exit_fs_btn.setIconSize(QSize(22, 22))
         exit_fs_btn.setFixedSize(44, 44)
-        exit_fs_btn.setToolTip("Salir de pantalla completa (Esc)")
+        exit_fs_btn.setToolTip(_("Salir de pantalla completa (Esc)"))
         exit_fs_btn.setStyleSheet(f"""
             QPushButton {{ 
                 background: rgba(255,255,255,0.05);
@@ -1299,7 +1304,7 @@ class ClipDetailDialog(QDialog):
         self._item.visible = self._vis_state
         
         # Actualizar texto del botón
-        vis_text = "Visible" if self._vis_state else "Oculto"
+        vis_text = _("Visible") if self._vis_state else _("Oculto")
         btn.setText(vis_text)
         
         # Actualizar color
@@ -1322,7 +1327,7 @@ class ClipDetailDialog(QDialog):
         # Actualizar también el botón en modo normal si existe
         if hasattr(self, '_vis_btn'):
             self._vis_btn.setIcon(eye_icon(size=(16, 16), color=TEXT2) if self._vis_state else eye_off_icon(size=(16, 16), color=DANGER))
-            self._vis_btn.setText(" Visible" if self._vis_state else " Oculto")
+            self._vis_btn.setText(_(" Visible") if self._vis_state else _(" Oculto"))
 
 
     def _goto_adjust(self):
@@ -1332,10 +1337,10 @@ class ClipDetailDialog(QDialog):
     def _confirm_delete(self):
         from PySide6.QtWidgets import QMessageBox
         dlg = QMessageBox(self)
-        dlg.setWindowTitle("Eliminar de la presentación")
-        dlg.setText(f'¿Eliminar "{self._item.name}"?')
-        ok = dlg.addButton("Eliminar", QMessageBox.ButtonRole.DestructiveRole)
-        dlg.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        dlg.setWindowTitle(_("Eliminar de la presentación"))
+        dlg.setText(_('¿Eliminar "{}"?').format(self._item.name))
+        ok = dlg.addButton(_("Eliminar"), QMessageBox.ButtonRole.DestructiveRole)
+        dlg.addButton(_("Cancelar"), QMessageBox.ButtonRole.RejectRole)
         dlg.exec()
         if dlg.clickedButton() == ok:
             self._deleted = True
@@ -1352,28 +1357,20 @@ class ClipDetailDialog(QDialog):
             except (RuntimeError, AttributeError):
                 pass
             
-            # Desconectar señales solo si están conectadas
-            try:
-                self._video_widget.position_changed.disconnect()
-            except (RuntimeError, TypeError):
-                # TypeError: señal no estaba conectada
-                # RuntimeError: widget ya destruido
-                pass
-            
-            try:
-                self._video_widget.file_loaded.disconnect()
-            except (RuntimeError, TypeError):
-                pass
-            
-            try:
-                self._video_widget.playback_started.disconnect()
-            except (RuntimeError, TypeError):
-                pass
-            
-            try:
-                self._video_widget.playback_paused.disconnect()
-            except (RuntimeError, TypeError):
-                pass
+            # Desconectar señales — warnings.catch_warnings suprime RuntimeWarning
+            # que PySide6 emite cuando la señal no tiene conexiones (no es excepción)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                for sig in (
+                    self._video_widget.position_changed,
+                    self._video_widget.file_loaded,
+                    self._video_widget.playback_started,
+                    self._video_widget.playback_paused,
+                ):
+                    try:
+                        sig.disconnect()
+                    except Exception:
+                        pass
             
             # Pausar y terminar mpv
             if self._mpv_player:
@@ -1445,6 +1442,7 @@ class DragDropListWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._insert_index  = -1
         self._selected_ids: set = set()
         self._last_idx      = -1
@@ -1493,6 +1491,7 @@ class DragDropListWidget(QWidget):
             self._selected_ids = {item_id}
         if idx >= 0:
             self._last_idx = idx
+        self.setFocus()
         self.update()
 
     def is_selected(self, item_id: str) -> bool:
@@ -1502,6 +1501,14 @@ class DragDropListWidget(QWidget):
         self._selected_ids.clear()
         self._last_idx = -1
         self.update()
+
+    def keyPressEvent(self, e):
+        if e.key() == Qt.Key.Key_Delete and self._selected_ids:
+            state.remove_pres_items(set(self._selected_ids))
+            self._selected_ids.clear()
+            self._last_idx = -1
+        else:
+            super().keyPressEvent(e)
 
     # ── Drop indicator ────────────────────────────────────────────────────────
 
@@ -1780,11 +1787,11 @@ class PresentationRowWidget(QWidget):
 
     def contextMenuEvent(self, e):
         menu = QMenu(self)
-        act_detail = menu.addAction("Abrir detalle")
-        act_dup    = menu.addAction("Duplicar registro")
-        act_vis    = menu.addAction("Cambiar visibilidad")
+        act_detail = menu.addAction(_("Abrir detalle"))
+        act_dup    = menu.addAction(_("Duplicar registro"))
+        act_vis    = menu.addAction(_("Cambiar visibilidad"))
         menu.addSeparator()
-        act_del    = menu.addAction("Eliminar registro")
+        act_del    = menu.addAction(_("Eliminar registro"))
         chosen = menu.exec(e.globalPos())
         if chosen == act_detail:
             self.edit_requested.emit(self._item.id)
@@ -1900,7 +1907,7 @@ class PresentationRowWidget(QWidget):
         self._col_widgets["name"] = name_wrap
 
         # TIPO
-        tipo_lbl = QLabel("Clip" if self._item.type == "clip" else "Img")
+        tipo_lbl = QLabel(_("Clip") if self._item.type == "clip" else _("Img"))
         tipo_lbl.setFixedWidth(w.get("tipo", 56))
         tipo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         tipo_lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(11)}px; background:transparent; border:none;")
@@ -2005,10 +2012,10 @@ class PresentationRowWidget(QWidget):
     def _confirm_delete(self):
         from PySide6.QtWidgets import QMessageBox
         dlg = QMessageBox(self)
-        dlg.setWindowTitle("Eliminar clip")
-        dlg.setText(f"¿Eliminás '{self._item.name}' de la presentación?")
-        ok  = dlg.addButton("Eliminar", QMessageBox.ButtonRole.DestructiveRole)
-        can = dlg.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        dlg.setWindowTitle(_("Eliminar clip"))
+        dlg.setText(_("¿Eliminás '{}' de la presentación?").format(self._item.name))
+        ok  = dlg.addButton(_("Eliminar"), QMessageBox.ButtonRole.DestructiveRole)
+        can = dlg.addButton(_("Cancelar"), QMessageBox.ButtonRole.RejectRole)
         dlg.exec()
         if dlg.clickedButton() == ok:
             self.delete_requested.emit(self._item.id)
@@ -2121,12 +2128,12 @@ class TableHeader(QWidget):
         w = self._widths
         col_defs = [
             ("num",    "#",        w["num"],                Qt.AlignmentFlag.AlignCenter, False),
-            ("name",   "NOMBRE",   w["name"],               Qt.AlignmentFlag.AlignLeft,   False),
-            ("tipo",   "TIPO",     w.get("tipo", 56),       Qt.AlignmentFlag.AlignCenter, False),
-            ("time",   "TIEMPO",   w.get("time", 80),       Qt.AlignmentFlag.AlignLeft,   False),
-            ("source", "FUENTE",   w.get("source", 140),    Qt.AlignmentFlag.AlignLeft,   False),
-            ("nota",   "NOTA",     None,                    Qt.AlignmentFlag.AlignLeft,   True),
-            ("dur",    "DURACIÓN", w.get("dur", 100),       Qt.AlignmentFlag.AlignRight,  False),
+            ("name",   _("NOMBRE"),   w["name"],               Qt.AlignmentFlag.AlignLeft,   False),
+            ("tipo",   _("TIPO"),     w.get("tipo", 56),       Qt.AlignmentFlag.AlignCenter, False),
+            ("time",   _("TIEMPO"),   w.get("time", 80),       Qt.AlignmentFlag.AlignLeft,   False),
+            ("source", _("FUENTE"),   w.get("source", 140),    Qt.AlignmentFlag.AlignLeft,   False),
+            ("nota",   _("NOTA"),     None,                    Qt.AlignmentFlag.AlignLeft,   True),
+            ("dur",    _("DURACIÓN"), w.get("dur", 100),       Qt.AlignmentFlag.AlignRight,  False),
             ("vis",    "",         w.get("vis", 40),        Qt.AlignmentFlag.AlignCenter, False),
         ]
 
@@ -2236,7 +2243,7 @@ class PresSlotWidget(QWidget):
         dot.setStyleSheet(f"background:{'#C9A44A' if self._active else 'transparent'}; border-radius:2px;")
         lo.addWidget(dot)
 
-        display_name = name if name else f"Listado {self._idx + 1}"
+        display_name = name if name else f"{_('Listado')} {self._idx + 1}"
         lbl = QLabel(display_name)
         lbl.setStyleSheet(
             f"color:{'#e8e4de' if self._active else '#7A7570'};"
@@ -2315,14 +2322,14 @@ class MultiPresBox(QWidget):
 
         hdr = QHBoxLayout()
         hdr.setContentsMargins(0, 0, 0, 4)
-        lbl = QLabel("LISTADOS")
+        lbl = QLabel(_("LISTADOS"))
         lbl.setStyleSheet(f"color:{ACCENT}; font-size:{fs(9)}px; font-weight:700; letter-spacing:1.8px;")
         hdr.addWidget(lbl)
         hdr.addStretch()
 
         add_btn = QPushButton("+")
         add_btn.setFixedSize(22, 22)
-        add_btn.setToolTip("Agregar listado a esta presentación")
+        add_btn.setToolTip(_("Agregar listado a esta presentación"))
         add_btn.setStyleSheet(
             f"QPushButton {{ background:transparent; color:{ACCENT}; border:none;"
             f" font-size:{fs(14)}px; font-weight:700; padding:0; min-height:0; min-width:0; }}"
@@ -2370,9 +2377,9 @@ class MultiPresBox(QWidget):
 
     def _on_rename_slot(self, idx: int):
         from PySide6.QtWidgets import QDialog, QLineEdit, QPushButton, QVBoxLayout, QLabel
-        current = self._get_slot_name(idx) or f"Listado {idx + 1}"
+        current = self._get_slot_name(idx) or f"{_("Listado")} {idx + 1}"
         dlg = QDialog(self)
-        dlg.setWindowTitle("Renombrar listado")
+        dlg.setWindowTitle(_("Renombrar listado"))
         dlg.setFixedWidth(300)
         from utils.theme_helpers import BG1, BG2, ACCENT, ACCENT2, ACCENT3, TEXT0, TEXT3, BORDER2
         from styles.theme import fs
@@ -2380,7 +2387,7 @@ class MultiPresBox(QWidget):
         vl = QVBoxLayout(dlg)
         vl.setContentsMargins(20, 20, 20, 20)
         vl.setSpacing(12)
-        lbl = QLabel("Nombre del listado")
+        lbl = QLabel(_("Nombre del listado"))
         lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(10)}px; font-weight:600; letter-spacing:1px;")
         vl.addWidget(lbl)
         inp = QLineEdit(current)
@@ -2389,10 +2396,10 @@ class MultiPresBox(QWidget):
         vl.addWidget(inp)
         btns_lo = QHBoxLayout()
         btns_lo.addStretch()
-        cancel_btn = QPushButton("Cancelar")
+        cancel_btn = QPushButton(_("Cancelar"))
         cancel_btn.clicked.connect(dlg.reject)
         btns_lo.addWidget(cancel_btn)
-        ok_btn = QPushButton("Renombrar")
+        ok_btn = QPushButton(_("Renombrar"))
         ok_btn.setStyleSheet(
             f"QPushButton {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
             f"stop:0 {ACCENT3},stop:1 {ACCENT}); color:#1a1714; border:none;"
@@ -2411,11 +2418,11 @@ class MultiPresBox(QWidget):
     def _on_del_slot(self, idx: int):
         from PySide6.QtWidgets import QMessageBox
         dlg = QMessageBox(self)
-        dlg.setWindowTitle("Eliminar listado")
-        name = self._get_slot_name(idx) or f"Listado {idx+1}"
-        dlg.setText(f"¿Eliminás '{name}' y sus {len(state.presentations[idx])} clips?")
-        ok  = dlg.addButton("Eliminar", QMessageBox.ButtonRole.DestructiveRole)
-        can = dlg.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        dlg.setWindowTitle(_("Eliminar listado"))
+        name = self._get_slot_name(idx) or f"{_('Listado')} {idx+1}"
+        dlg.setText(_("¿Eliminás '{}' y sus {} clips?").format(name, len(state.presentations[idx])))
+        ok  = dlg.addButton(_("Eliminar"), QMessageBox.ButtonRole.DestructiveRole)
+        can = dlg.addButton(_("Cancelar"), QMessageBox.ButtonRole.RejectRole)
         dlg.exec()
         if dlg.clickedButton() == ok:
             state.remove_presentation_slot(idx)
@@ -2424,6 +2431,324 @@ class MultiPresBox(QWidget):
         super().showEvent(e)
         self._rebuild()
 
+
+
+class PreviewDialog(QDialog):
+    """Vista previa — reproduce clips/imágenes en secuencia sin renderizar."""
+
+    def __init__(self, items: list, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(_("Vista previa"))
+        self.setModal(True)
+        self.resize(854, 540)
+        self.setStyleSheet(f"QDialog {{ background:{BG0}; }}")
+
+        self._items = [it for it in items if getattr(it, 'visible', True)]
+        self._idx = 0
+        self._playing = False
+        self._advancing = False
+        self._current_start = 0.0
+        self._current_end = 0.0
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # ── Área de media — QStackedWidget evita conflicto render mpv/Qt ─────
+        from PySide6.QtWidgets import QStackedWidget
+        self._stack = QStackedWidget()
+        self._stack.setStyleSheet("background:#000;")
+
+        # índice 0: reproductor de video (sin parent, como ClipDetailDialog)
+        self._player = MpvWidget()
+        self._player.setMinimumHeight(320)
+        self._stack.addWidget(self._player)       # index 0
+
+        # índice 1: label para imágenes
+        self._img_lbl = QLabel()
+        self._img_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._img_lbl.setStyleSheet("background:#000; border:none;")
+        self._stack.addWidget(self._img_lbl)      # index 1
+
+        root.addWidget(self._stack, 1)
+
+        # ── Barra inferior ────────────────────────────────────────────────────
+        bar = QWidget()
+        bar.setStyleSheet(f"background:{BG1}; border-top:1px solid {BG3};")
+        bar.setFixedHeight(78)
+        bl = QVBoxLayout(bar)
+        bl.setContentsMargins(16, 6, 16, 8)
+        bl.setSpacing(4)
+
+        prog_row = QHBoxLayout()
+        prog_row.setSpacing(8)
+        self._pos_lbl = QLabel("0:00:00")
+        self._pos_lbl.setStyleSheet(f"color:{TEXT2}; font-size:{fs(11)}px; min-width:54px;")
+        self._slider = QSlider(Qt.Orientation.Horizontal)
+        self._slider.setRange(0, 10000)
+        self._slider.setValue(0)
+        self._slider.setEnabled(False)
+        self._slider.setStyleSheet(f"""
+            QSlider::groove:horizontal {{ height:3px; background:{BG3}; border-radius:2px; }}
+            QSlider::sub-page:horizontal {{ background:{ACCENT}; border-radius:2px; }}
+            QSlider::handle:horizontal {{
+                background:{ACCENT}; width:10px; height:10px;
+                margin:-4px 0; border-radius:5px;
+            }}
+        """)
+        self._dur_lbl = QLabel("0:00:00")
+        self._dur_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._dur_lbl.setStyleSheet(f"color:{TEXT2}; font-size:{fs(11)}px; min-width:54px;")
+        prog_row.addWidget(self._pos_lbl)
+        prog_row.addWidget(self._slider, 1)
+        prog_row.addWidget(self._dur_lbl)
+        bl.addLayout(prog_row)
+
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setSpacing(8)
+        self._item_lbl = QLabel()
+        self._item_lbl.setStyleSheet(f"color:{TEXT1}; font-size:{fs(12)}px;")
+
+        _btn_base = (
+            f"QPushButton {{ background:{BG2}; border:none; border-radius:4px; padding:4px 10px; }}"
+            f"QPushButton:hover {{ background:{BG3}; }}"
+            f"QPushButton:disabled {{ opacity:0.4; }}"
+        )
+        self._prev_btn = QPushButton()
+        self._prev_btn.setIcon(previous_icon(size=(16, 16), color=TEXT0))
+        self._prev_btn.setIconSize(QSize(16, 16))
+        self._prev_btn.setFixedSize(36, 30)
+        self._prev_btn.setStyleSheet(_btn_base)
+
+        self._play_btn = QPushButton()
+        self._play_btn.setIcon(play_icon(size=(18, 18), color="#1a1714"))
+        self._play_btn.setIconSize(QSize(18, 18))
+        self._play_btn.setFixedSize(52, 30)
+        self._play_btn.setStyleSheet(f"""
+            QPushButton {{ background:{ACCENT}; border:none; border-radius:4px; }}
+            QPushButton:hover {{ background:{ACCENT3}; }}
+            QPushButton:disabled {{ background:{BG3}; }}
+        """)
+
+        self._next_btn = QPushButton()
+        self._next_btn.setIcon(next_icon(size=(16, 16), color=TEXT0))
+        self._next_btn.setIconSize(QSize(16, 16))
+        self._next_btn.setFixedSize(36, 30)
+        self._next_btn.setStyleSheet(_btn_base)
+
+        ctrl_row.addWidget(self._item_lbl, 1)
+        ctrl_row.addWidget(self._prev_btn)
+        ctrl_row.addWidget(self._play_btn)
+        ctrl_row.addWidget(self._next_btn)
+        bl.addLayout(ctrl_row)
+        root.addWidget(bar)
+
+        self._player.position_changed.connect(self._on_position)
+        self._prev_btn.clicked.connect(self._prev_item)
+        self._play_btn.clicked.connect(self._toggle_play)
+        self._next_btn.clicked.connect(lambda: self._advance())
+
+        self._img_timer = QTimer(self)
+        self._img_timer.setSingleShot(True)
+        self._img_timer.timeout.connect(self._advance)
+
+        if self._items:
+            self._go_to(0)
+        else:
+            self._play_btn.setEnabled(False)
+            self._item_lbl.setText(_("Sin clips visibles en la presentación"))
+
+    # ── Navegación ────────────────────────────────────────────────────────────
+
+    def _go_to(self, idx: int):
+        self._advancing = False
+        self._img_timer.stop()
+        self._player.pause()
+
+        idx = max(0, min(idx, len(self._items) - 1))
+        self._idx = idx
+        item = self._items[idx]
+        n = len(self._items)
+
+        self._item_lbl.setText(f"{idx + 1} / {n}  —  {item.name}")
+        self._prev_btn.setEnabled(idx > 0)
+        self._next_btn.setEnabled(idx < n - 1)
+
+        if item.type == "image":
+            self._stack.setCurrentIndex(1)
+            pm = QPixmap(item.image_path)
+            if not pm.isNull():
+                self._img_lbl.setPixmap(pm.scaled(
+                    self._stack.size(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                ))
+            else:
+                self._img_lbl.setText(_("Imagen no encontrada"))
+            dur = float(getattr(item, 'image_dur', 3.0))
+            self._current_start = 0.0
+            self._current_end = dur
+            self._slider.setValue(0)
+            self._pos_lbl.setText(fmt_time(0.0))
+            self._dur_lbl.setText(fmt_time(dur))
+            if self._playing:
+                self._img_timer.start(int(dur * 1000))
+        else:
+            self._stack.setCurrentIndex(0)
+            self._current_start = float(item.clip_start)
+            self._current_end = float(item.clip_start) + float(item.clip_dur)
+            dur = float(item.clip_dur)
+            self._slider.setValue(0)
+            self._pos_lbl.setText(fmt_time(0.0))
+            self._dur_lbl.setText(fmt_time(dur))
+
+            # Inline closure por load — mismo patrón que ClipDetailDialog
+            _start = self._current_start
+            _play  = self._playing
+
+            def _on_loaded():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    try:
+                        self._player.file_loaded.disconnect(_on_loaded)
+                    except Exception:
+                        pass
+                self._player.seek(_start)
+                if _play:
+                    self._player.play()
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                try:
+                    self._player.file_loaded.disconnect()
+                except Exception:
+                    pass
+            self._player.file_loaded.connect(_on_loaded)
+            self._player.load(item.video_path)
+
+    def _on_position(self, pos: float):
+        if self._advancing:
+            return
+        if not self._items or self._idx >= len(self._items):
+            return
+        if self._items[self._idx].type == "image":
+            return
+        clip_pos = max(0.0, pos - self._current_start)
+        clip_dur = max(0.001, self._current_end - self._current_start)
+        self._slider.setValue(int(min(clip_pos / clip_dur, 1.0) * 10000))
+        self._pos_lbl.setText(fmt_time(clip_pos))
+        if self._playing and pos >= self._current_end - 0.12:
+            self._advance()
+
+    def _advance(self):
+        if self._advancing:
+            return
+        self._advancing = True
+        self._img_timer.stop()
+        if self._idx < len(self._items) - 1:
+            self._go_to(self._idx + 1)
+        else:
+            self._playing = False
+            self._play_btn.setIcon(play_icon(size=(18, 18), color="#1a1714"))
+            self._advancing = False
+
+    def _toggle_play(self):
+        if not self._items:
+            return
+        self._playing = not self._playing
+        item = self._items[self._idx]
+        if self._playing:
+            self._play_btn.setIcon(pause_icon(size=(18, 18), color="#1a1714"))
+            if item.type == "image":
+                self._img_timer.start(int(float(getattr(item, 'image_dur', 3.0)) * 1000))
+            else:
+                self._player.play()
+        else:
+            self._play_btn.setIcon(play_icon(size=(18, 18), color="#1a1714"))
+            self._img_timer.stop()
+            self._player.pause()
+
+    def _prev_item(self):
+        was = self._playing
+        self._playing = False
+        self._play_btn.setIcon(play_icon(size=(18, 18), color="#1a1714"))
+        self._go_to(self._idx - 1)
+        if was:
+            self._playing = True
+            self._play_btn.setIcon(pause_icon(size=(18, 18), color="#1a1714"))
+            item = self._items[self._idx]
+            if item.type == "image":
+                self._img_timer.start(int(float(getattr(item, 'image_dur', 3.0)) * 1000))
+
+    def closeEvent(self, e):
+        self._img_timer.stop()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            try:
+                self._player.file_loaded.disconnect()
+            except Exception:
+                pass
+        # Terminar mpv antes de que el diálogo destruya los widgets — mismo
+        # orden que MpvWidget.closeEvent, que no se llama para widgets no top-level
+        if hasattr(self._player, '_ui_timer') and self._player._ui_timer:
+            try:
+                self._player._ui_timer.stop()
+            except Exception:
+                pass
+        if getattr(self._player, '_player', None):
+            try:
+                self._player._player.terminate()
+            except Exception:
+                pass
+        super().closeEvent(e)
+
+
+def _make_pres_placeholder() -> "QWidget":
+    from PySide6.QtCore import QByteArray
+    from PySide6.QtWidgets import QVBoxLayout, QLabel
+    SVG = (
+        b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"'
+        b' stroke="#3E3C3A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        b'<rect x="2" y="4" width="20" height="16" rx="2"/>'
+        b'<line x1="7" y1="4" x2="7" y2="20"/>'
+        b'<line x1="17" y1="4" x2="17" y2="20"/>'
+        b'<line x1="2" y1="9" x2="7" y2="9"/>'
+        b'<line x1="17" y1="9" x2="22" y2="9"/>'
+        b'<line x1="2" y1="15" x2="7" y2="15"/>'
+        b'<line x1="17" y1="15" x2="22" y2="15"/>'
+        b'</svg>'
+    )
+    container = QWidget()
+    container.setStyleSheet("background:transparent;")
+    lo = QVBoxLayout(container)
+    lo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    lo.setSpacing(12)
+    lo.setContentsMargins(20, 30, 20, 20)
+    icon_lbl = QLabel()
+    icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    icon_lbl.setStyleSheet("background:transparent; border:none;")
+    try:
+        from PySide6.QtSvg import QSvgRenderer
+        from PySide6.QtGui import QPainter, QPixmap
+        renderer = QSvgRenderer(QByteArray(SVG))
+        pm = QPixmap(40, 40)
+        pm.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pm)
+        renderer.render(p)
+        p.end()
+        icon_lbl.setPixmap(pm)
+    except Exception:
+        pass
+    lo.addWidget(icon_lbl)
+    txt = QLabel(_("El listado está vacío\nAgregá clips desde Ajuste"))
+    txt.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    txt.setWordWrap(True)
+    txt.setStyleSheet(
+        f"color:#3E3C3A; font-size:{fs(13)}px;"
+        f" background:transparent; border:none;"
+    )
+    lo.addWidget(txt)
+    return container
 
 
 # ── Pantalla principal ────────────────────────────────────────────────────────
@@ -2481,9 +2806,7 @@ class PresentationScreen(QWidget):
         self._list_widget = DragDropListWidget()
         self._list_layout = self._list_widget.layout()
 
-        self._empty_lbl = QLabel("\n\nEl listado está vacío\nAgregá clips desde Ajuste")
-        self._empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._empty_lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(13)}px;")
+        self._empty_lbl = _make_pres_placeholder()
         self._list_layout.insertWidget(0, self._empty_lbl)
 
         self._list_scroll.setWidget(self._list_widget)
@@ -2500,7 +2823,7 @@ class PresentationScreen(QWidget):
         fl = QHBoxLayout(footer)
         fl.setContentsMargins(12, 0, 12, 0)
         fl.setSpacing(6)
-        self._footer_lbl = QLabel("0 clips  ·  0 imágenes  ·  0:00")
+        self._footer_lbl = QLabel(_("0 clips  ·  0 imágenes  ·  0:00"))
         self._footer_lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(10)}px; letter-spacing:0.5px;")
         fl.addWidget(self._footer_lbl)
         fl.addStretch()
@@ -2509,7 +2832,7 @@ class PresentationScreen(QWidget):
 
         zoom_out_btn = QPushButton("🔍−")
         zoom_out_btn.setFixedSize(32, 26)
-        zoom_out_btn.setToolTip("Filas más chicas")
+        zoom_out_btn.setToolTip(_("Filas más chicas"))
         zoom_out_btn.setStyleSheet(
             f"QPushButton {{ background:transparent; color:{TEXT2}; border:1px solid {BORDER2};"
             f" font-size:{fs(12)}px; padding:0; min-height:0; min-width:0; border-radius:3px; }}"
@@ -2520,7 +2843,7 @@ class PresentationScreen(QWidget):
 
         zoom_in_btn = QPushButton("🔍+")
         zoom_in_btn.setFixedSize(32, 26)
-        zoom_in_btn.setToolTip("Filas más grandes")
+        zoom_in_btn.setToolTip(_("Filas más grandes"))
         zoom_in_btn.setStyleSheet(
             f"QPushButton {{ background:transparent; color:{TEXT2}; border:1px solid {BORDER2};"
             f" font-size:{fs(12)}px; padding:0; min-height:0; min-width:0; border-radius:3px; }}"
@@ -2542,7 +2865,7 @@ class PresentationScreen(QWidget):
         sl.setSpacing(12)
 
         # Botón producir — grande y prominente
-        self._render_btn = QPushButton("Crear película")
+        self._render_btn = QPushButton(_("Crear película"))
         self._render_btn.setMinimumHeight(52)
         self._render_btn.setStyleSheet(f"""
             QPushButton {{
@@ -2563,8 +2886,26 @@ class PresentationScreen(QWidget):
         self._render_btn.clicked.connect(self._start_render)
         sl.addWidget(self._render_btn)
 
+        # Botón vista previa
+        self._preview_btn = QPushButton(_("▶  Vista previa"))
+        self._preview_btn.setMinimumHeight(34)
+        self._preview_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: {TEXT1};
+                border: 1px solid {BG3};
+                border-radius: 0;
+                font-size: {fs(12)}px;
+                padding: 4px;
+            }}
+            QPushButton:hover {{ color:{ACCENT}; border-color:{ACCENT}; }}
+            QPushButton:disabled {{ color:{TEXT3}; border-color:{BG3}; }}
+        """)
+        self._preview_btn.clicked.connect(self._open_preview)
+        sl.addWidget(self._preview_btn)
+
         # Agregar imagen
-        add_img_btn = QPushButton("+ Agregar imagen")
+        add_img_btn = QPushButton(_("+ Agregar imagen"))
         add_img_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;
@@ -2589,12 +2930,12 @@ class PresentationScreen(QWidget):
             return l
 
         # Stats
-        sl.addWidget(section_lbl("RESUMEN"))
+        sl.addWidget(section_lbl(_("RESUMEN")))
         stats = QWidget(); stats.setStyleSheet("background:transparent;")
         sg = QHBoxLayout(stats); sg.setSpacing(4); sg.setContentsMargins(0,0,0,0)
-        self._stat_clips = self._stat_card("Clips", "0")
-        self._stat_dur   = self._stat_card("Total", "0s")
-        self._stat_imgs  = self._stat_card("Imgs", "0")
+        self._stat_clips = self._stat_card(_("Clips"), "0")
+        self._stat_dur   = self._stat_card(_("Total"), "0s")
+        self._stat_imgs  = self._stat_card(_("Imgs"), "0")
         sg.addWidget(self._stat_clips[0])
         sg.addWidget(self._stat_dur[0])
         sg.addWidget(self._stat_imgs[0])
@@ -2666,7 +3007,7 @@ class PresentationScreen(QWidget):
         m = int(total // 60)
         s = int(total % 60)
 
-        self._footer_lbl.setText(f"{clips} clips  ·  {imgs} imágenes  ·  {m}:{s:02d}")
+        self._footer_lbl.setText(_("{} clips  ·  {} imágenes  ·  {}:{}").format(clips, imgs, m, f"{s:02d}"))
         try:
             self._stat_clips[1].setText(str(clips))
             self._stat_dur[1].setText(fmt_dur(total))
@@ -2712,9 +3053,14 @@ class PresentationScreen(QWidget):
         self._row_height = max(24, min(56, self._row_height + delta))
         self._refresh()
 
+    def _open_preview(self):
+        items = state.presentation
+        dlg = PreviewDialog(items, parent=self)
+        dlg.exec()
+
     def _add_image(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Seleccionar imagen",
-            filter="Imagen (*.jpg *.jpeg *.png *.webp *.bmp)")
+        path, _sel = QFileDialog.getOpenFileName(self, _("Seleccionar imagen"),
+            "", "Imagen (*.jpg *.jpeg *.png *.webp *.bmp)")
         if path:
             state.add_image_to_presentation(path)
 
@@ -2743,14 +3089,14 @@ class PresentationScreen(QWidget):
 
     def _start_render(self):
         if not state.presentation:
-            state.toast_requested.emit("Agregá clips primero"); return
+            state.toast_requested.emit(_("Agregá clips primero")); return
         settings_dlg = RenderSettingsDialog(self)
         if settings_dlg.exec() != QDialog.DialogCode.Accepted: return
 
         # Filter out hidden items
         visible_items = [p for p in state.presentation if p.visible]
         if not visible_items:
-            state.toast_requested.emit("Todos los items están ocultos"); return
+            state.toast_requested.emit(_("Todos los items están ocultos")); return
 
         if settings_dlg.separate_files:
             self._render_separate(visible_items, settings_dlg)
@@ -2759,8 +3105,8 @@ class PresentationScreen(QWidget):
 
     def _render_single(self, visible_items, settings_dlg):
         """Render normal: un solo MP4 concatenado."""
-        path, _ = QFileDialog.getSaveFileName(self, "Exportar presentación",
-            "presentacion.mp4", filter="Video MP4 (*.mp4)")
+        path, _sel = QFileDialog.getSaveFileName(self, _("Exportar presentación"),
+            "presentacion.mp4", "Video MP4 (*.mp4)")
         if not path: return
         items = [{"type": p.type, "name": p.name,
                   "video_path": p.video_path, "image_path": p.image_path,
@@ -2769,7 +3115,7 @@ class PresentationScreen(QWidget):
                  for p in visible_items]
         total_dur = sum(p.duration for p in visible_items)
         self._render_btn.setEnabled(False)
-        self._render_btn.setText("Procesando...")
+        self._render_btn.setText(_("Procesando..."))
         self._progress_dlg = RenderProgressDialog(total_dur, self)
         self._progress_dlg.set_output_path(path)  # Guardar path del video
         self._render_thread = RenderThread(items, path, settings_dlg.show_overlay,
@@ -2784,10 +3130,10 @@ class PresentationScreen(QWidget):
     def _render_separate(self, visible_items, settings_dlg):
         """Render separado: un MP4 por cada registro."""
         import os
-        folder = QFileDialog.getExistingDirectory(self, "Carpeta para archivos separados")
+        folder = QFileDialog.getExistingDirectory(self, _("Carpeta para archivos separados"))
         if not folder: return
         self._render_btn.setEnabled(False)
-        self._render_btn.setText("Procesando...")
+        self._render_btn.setText(_("Procesando..."))
         total_dur = sum(p.duration for p in visible_items)
         self._progress_dlg = RenderProgressDialog(total_dur, self)
         self._sep_items = visible_items
@@ -2808,10 +3154,10 @@ class PresentationScreen(QWidget):
             from PySide6.QtCore import QTimer
             QTimer.singleShot(600, self._progress_dlg.accept)
             self._render_btn.setEnabled(True)
-            self._render_btn.setText("Crear película")
+            self._render_btn.setText(_("Crear película"))
             state.toast_requested.emit(
-                f"{self._sep_ok} archivos exportados"
-                + (f", {self._sep_fail} con error" if self._sep_fail else ""))
+                _("{} archivos exportados").format(self._sep_ok)
+                + (_(", {} con error").format(self._sep_fail) if self._sep_fail else ""))
             return
 
         p = self._sep_items[self._sep_idx]
@@ -2851,16 +3197,16 @@ class PresentationScreen(QWidget):
         if hasattr(self, '_progress_dlg'):
             self._progress_dlg.accept()
         self._render_btn.setEnabled(True)
-        self._render_btn.setText("Crear película")
+        self._render_btn.setText(_("Crear película"))
 
     def _on_render_done(self, success: bool, msg: str):
         self._render_btn.setEnabled(True)
-        self._render_btn.setText("Crear película")
+        self._render_btn.setText(_("Crear película"))
         if hasattr(self, '_progress_dlg'):
             if success:
                 self._progress_dlg.mark_done()
                 # NO cerrar automáticamente - dejar que el usuario elija
             else:
                 self._progress_dlg.accept()
-                state.toast_requested.emit(f"Error en el render: {msg}")
+                state.toast_requested.emit(_("Error en el render: {}").format(msg))
                 print(f"[RENDER ERROR]\n{msg}")

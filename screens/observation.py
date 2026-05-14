@@ -13,13 +13,50 @@ from store.state import state, Clip, Button
 from utils.theme_helpers import BG0, BG1, BG2, BG3, BG4, ACCENT, ACCENT2, ACCENT3, TEXT0, TEXT1, TEXT2, TEXT3, BORDER, BORDER2
 from styles.theme import CLIP_COLORS, fs, fs
 from utils.time_utils import fmt_time
+from utils.i18n import _
 from icons_helper import play_icon, pause_icon, mute_icon, volume_icon, fullscreen_icon
+
+
+def _make_svg_placeholder(svg_bytes: bytes, text: str, font_size_px) -> QWidget:
+    """Widget de estado vacío con ícono SVG + texto descriptivo."""
+    from PySide6.QtCore import QByteArray
+    container = QWidget()
+    container.setStyleSheet("background:transparent;")
+    lo = QVBoxLayout(container)
+    lo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    lo.setSpacing(10)
+    lo.setContentsMargins(16, 24, 16, 20)
+    icon_lbl = QLabel()
+    icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    icon_lbl.setStyleSheet("background:transparent; border:none;")
+    try:
+        from PySide6.QtSvg import QSvgRenderer
+        from PySide6.QtGui import QPainter, QPixmap
+        renderer = QSvgRenderer(QByteArray(svg_bytes))
+        pm = QPixmap(36, 36)
+        pm.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pm)
+        renderer.render(p)
+        p.end()
+        icon_lbl.setPixmap(pm)
+    except Exception:
+        pass
+    lo.addWidget(icon_lbl)
+    txt = QLabel(text)
+    txt.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    txt.setWordWrap(True)
+    txt.setStyleSheet(
+        f"color:#3E3C3A; font-size:{font_size_px}px;"
+        f" background:transparent; border:none;"
+    )
+    lo.addWidget(txt)
+    return container
 
 
 class AddButtonDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Nuevo botón")
+        self.setWindowTitle(_("Nuevo botón"))
         self.setFixedWidth(340)
         self.setModal(True)
         from utils.theme_helpers import BG1, BG2, ACCENT, TEXT0, TEXT3, ACCENT2
@@ -28,22 +65,22 @@ class AddButtonDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(14)
 
-        lbl = QLabel("NOMBRE DEL BOTÓN")
+        lbl = QLabel(_("NOMBRE DEL BOTÓN"))
         lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(10)}px; font-weight:600; letter-spacing:1px;")
         layout.addWidget(lbl)
 
         self._input = QLineEdit()
         self._input.setMaxLength(18)
-        self._input.setPlaceholderText("Ej: PNR, Poste bajo, Transición...")
+        self._input.setPlaceholderText(_("Ej: PNR, Poste bajo, Transición..."))
         self._input.returnPressed.connect(self._create_another)
         layout.addWidget(self._input)
 
-        hint = QLabel("Enter = Crear otro")
+        hint = QLabel(_("Enter = Crear otro"))
         hint.setStyleSheet(f"color:{TEXT3}; font-size:{fs(10)}px;")
         layout.addWidget(hint)
 
         btns = QHBoxLayout()
-        done_btn = QPushButton("Listo")
+        done_btn = QPushButton(_("Listo"))
         done_btn.setObjectName("primary")
         done_btn.setStyleSheet(
             f"QPushButton {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
@@ -54,7 +91,7 @@ class AddButtonDialog(QDialog):
             f"QPushButton:pressed {{ border-bottom:none; padding-top:8px; }}"
         )
         done_btn.clicked.connect(self._finish)
-        create_btn = QPushButton("Crear otro")
+        create_btn = QPushButton(_("Crear otro"))
         create_btn.clicked.connect(self._create_another)
         btns.addStretch()
         btns.addWidget(create_btn)
@@ -98,8 +135,9 @@ class AddButtonDialog(QDialog):
 class ObservationScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._btn_widgets  = {}
-        self._clip_widgets = {}
+        self._btn_widgets     = {}
+        self._clip_widgets    = {}
+        self._clip_pres_state = {}  # {clip_id: in_presentation} para detectar cambios
         self._tab_widgets  = []
         self._muted        = False
         self._speeds       = [0.25, 0.5, 1.0, 1.5, 2.0]
@@ -140,7 +178,7 @@ class ObservationScreen(QWidget):
         hh = QHBoxLayout(hdr)
         hh.setContentsMargins(16, 0, 10, 0)
         hh.setSpacing(0)
-        hh.addWidget(QLabel("BOTONES", styleSheet=f"""
+        hh.addWidget(QLabel(_("BOTONES"), styleSheet=f"""
                 color: {ACCENT};
                 font-size: {fs(10)}px;
                 font-weight: 700;
@@ -151,7 +189,7 @@ class ObservationScreen(QWidget):
         add_btn = QPushButton("+")
         add_btn.setFixedSize(26, 26)
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        add_btn.setToolTip("Nuevo botón")
+        add_btn.setToolTip(_("Nuevo botón"))
         add_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;
@@ -177,7 +215,7 @@ class ObservationScreen(QWidget):
         cfg_btn = QPushButton("⚙")
         cfg_btn.setFixedSize(26, 26)
         cfg_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        cfg_btn.setToolTip("Configurar botones")
+        cfg_btn.setToolTip(_("Configurar botones"))
         cfg_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;
@@ -220,9 +258,16 @@ class ObservationScreen(QWidget):
         scroll.setWidget(self._btn_container)
         ll.addWidget(scroll, stretch=1)
 
-        self._btn_empty = QLabel("Creá tu primer botón\ncon el  +  de arriba")
-        self._btn_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._btn_empty.setStyleSheet(f"color:{TEXT3}; font-size:{fs(11)}px; padding:24px 0;")
+        self._btn_empty = _make_svg_placeholder(
+            b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"'
+            b' stroke="#3E3C3A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+            b'<rect x="2" y="6" width="20" height="13" rx="3"/>'
+            b'<line x1="12" y1="10" x2="12" y2="15"/>'
+            b'<line x1="9.5" y1="12.5" x2="14.5" y2="12.5"/>'
+            b'</svg>',
+            _("Creá tu primer botón\ncon el  +  de arriba"),
+            fs(11)
+        )
         self._btn_layout.insertWidget(0, self._btn_empty)
 
         # left se agrega al splitter más abajo
@@ -278,7 +323,7 @@ class ObservationScreen(QWidget):
                 background: rgba(255,255,255,0.03);
             }}
         """)
-        self._add_src_btn.setToolTip("Agregar video fuente")
+        self._add_src_btn.setToolTip(_("Agregar video fuente"))
         self._add_src_btn.clicked.connect(self._open_video)
         self._tab_bar_layout.addWidget(self._add_src_btn)
         trl.addWidget(self._tab_bar)
@@ -309,7 +354,7 @@ class ObservationScreen(QWidget):
         )
         folder_btn.clicked.connect(self._open_video)
         ph.addWidget(folder_btn)
-        load_btn = QPushButton("Agregar video fuente")
+        load_btn = QPushButton(_("Agregar video fuente"))
         load_btn.setStyleSheet(
             f"QPushButton {{ background:transparent; color:{ACCENT}; border:none;"
             f" border-bottom:1px solid {ACCENT}; font-size:{fs(14)}px; font-weight:600;"
@@ -318,7 +363,7 @@ class ObservationScreen(QWidget):
         )
         load_btn.clicked.connect(self._open_video)
         ph.addWidget(load_btn)
-        ph.addWidget(QLabel("MP4 · MOV · AVI · MKV",
+        ph.addWidget(QLabel(_("MP4 · MOV · AVI · MKV"),
             styleSheet=f"color:{TEXT3}; font-size:{fs(11)}px;",
             alignment=Qt.AlignmentFlag.AlignCenter))
 
@@ -401,7 +446,7 @@ class ObservationScreen(QWidget):
                 border-bottom:1px solid {BORDER2}; padding:0; icon-size:18px 18px; }}
             QPushButton:hover {{ border-bottom:1px solid {ACCENT}; }}
         """)
-        self._fs_btn.setToolTip("Pantalla completa (F)")
+        self._fs_btn.setToolTip(_("Pantalla completa (F)"))
         self._fs_btn.clicked.connect(self._enter_fullscreen)
         cl.addWidget(self._fs_btn)
 
@@ -414,7 +459,7 @@ class ObservationScreen(QWidget):
         rh_w.setObjectName("reg_header")
         rh = QHBoxLayout(rh_w)
         rh.setContentsMargins(12, 0, 12, 0)
-        self._reg_lbl = QLabel("REGISTROS (0)")
+        self._reg_lbl = QLabel(_("REGISTROS ({})").format(0))
         self._reg_lbl.setStyleSheet(f"""
             color: {ACCENT};
             font-size: {fs(10)}px;
@@ -435,7 +480,7 @@ class ObservationScreen(QWidget):
         self._reg_layout.setContentsMargins(0, 0, 0, 0)
         self._reg_layout.setSpacing(0)
         self._reg_layout.addStretch()
-        self._reg_empty = QLabel("Presioná un botón mientras el video corre")
+        self._reg_empty = QLabel(_("Presioná un botón mientras el video corre"))
         self._reg_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._reg_empty.setStyleSheet(f"color:{TEXT3}; font-size:{fs(12)}px; padding:20px;")
         self._reg_layout.insertWidget(0, self._reg_empty)
@@ -503,6 +548,7 @@ class ObservationScreen(QWidget):
     def _connect_state(self):
         state.buttons_changed.connect(self._sync_buttons)
         state.clips_changed.connect(self._sync_clips)
+        state.presentation_changed.connect(self._sync_clips)
         state.sources_changed.connect(self._rebuild_tabs)
         state.active_source_changed.connect(self._on_source_changed)
         self._sync_buttons()
@@ -601,7 +647,7 @@ class ObservationScreen(QWidget):
 
     def _open_video(self):
         paths, _ = QFileDialog.getOpenFileNames(
-            self, "Agregar video fuente",
+            self, _("Agregar video fuente"),
             filter="Video (*.mp4 *.mov *.avi *.mkv *.webm *.m4v *.mts)")
         for path in paths:
             state.add_video_source(path)
@@ -704,6 +750,30 @@ class ObservationScreen(QWidget):
 
         rl.addWidget(ab, stretch=1)
         rl.addWidget(count_lbl)
+
+        # Hotkey badge — pequeño indicador de tecla asignada
+        hk = getattr(btn, 'hotkey', '') or ''
+        hk_container = QWidget()
+        hk_container.setFixedWidth(26)
+        hk_container.setFixedHeight(34)
+        hk_container.setStyleSheet("background:transparent;")
+        if hk:
+            _hlo = QVBoxLayout(hk_container)
+            _hlo.setContentsMargins(0, 0, 4, 0)
+            _hlo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            _hk = QLabel(hk.upper())
+            _hk.setFixedSize(17, 13)
+            _hk.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            _hk.setStyleSheet(
+                f"background:{BG3}; color:{TEXT1};"
+                f" border:1px solid rgba(255,252,248,0.12);"
+                f" border-radius:3px;"
+                f" font-size:{fs(8)}px; font-weight:700;"
+                f" font-family:'Courier New',monospace;"
+            )
+            _hlo.addWidget(_hk)
+        rl.addWidget(hk_container)
+
         return row, count_lbl
 
     def _register_clip(self, btn: Button):
@@ -717,29 +787,36 @@ class ObservationScreen(QWidget):
     def _sync_clips(self):
         current_ids = {c.id for c in state.clips}
         for cid in set(self._clip_widgets) - current_ids:
-            w = self._clip_widgets.pop(cid)
+            w, _ind = self._clip_widgets.pop(cid)
+            self._clip_pres_state.pop(cid, None)
             try:
                 self._reg_layout.removeWidget(w)
                 w.deleteLater()
             except RuntimeError:
                 pass
         for clip in state.clips:
+            in_pres = getattr(clip, 'in_presentation', False)
             if clip.id not in self._clip_widgets:
-                row = self._make_clip_row(clip)
+                row, pres_ind = self._make_clip_row(clip)
                 self._reg_layout.insertWidget(0, row)
-                self._clip_widgets[clip.id] = row
-        self._reg_lbl.setText(f"REGISTROS ({len(state.clips)})")
+                self._clip_widgets[clip.id] = (row, pres_ind)
+                self._clip_pres_state[clip.id] = in_pres
+            elif self._clip_pres_state.get(clip.id) != in_pres:
+                # in_presentation cambió — actualizar solo el indicador ✓
+                _row, pres_ind = self._clip_widgets[clip.id]
+                pres_ind.setVisible(in_pres)
+                self._clip_pres_state[clip.id] = in_pres
+        self._reg_lbl.setText(_("REGISTROS ({})").format(len(state.clips)))
         self._reg_empty.setVisible(len(state.clips) == 0)
         for btn in state.buttons:
             if btn.id in self._btn_widgets:
-                # Contar clips que empiezan con el label del botón (incluye #1, #2, etc)
                 count = sum(1 for c in state.clips if getattr(c, 'category', c.name) == btn.label)
                 try:
                     self._btn_widgets[btn.id][1].setText(str(count))
                 except RuntimeError:
                     pass
 
-    def _make_clip_row(self, clip: Clip) -> QWidget:
+    def _make_clip_row(self, clip: Clip):
         row = QWidget()
         row.setFixedHeight(32)
         row.setStyleSheet(f"""
@@ -767,6 +844,19 @@ class ObservationScreen(QWidget):
         tl.setStyleSheet(f"color:{TEXT2}; font-size:{fs(11)}px; background:transparent; border:none;")
         rl.addWidget(tl)
 
+        # Indicador ✓ — siempre creado, visible solo si in_presentation
+        pres_ind = QLabel("✓")
+        pres_ind.setFixedWidth(14)
+        pres_ind.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pres_ind.setToolTip(_("Ya está en la presentación"))
+        pres_ind.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        pres_ind.setStyleSheet(
+            f"color:#27AE60; font-size:{fs(11)}px; font-weight:700;"
+            f" background:transparent; border:none;"
+        )
+        pres_ind.setVisible(getattr(clip, 'in_presentation', False))
+        rl.addWidget(pres_ind)
+
         del_btn = QPushButton("x")
         del_btn.setFixedSize(18, 18)
         del_btn.setStyleSheet(
@@ -779,7 +869,7 @@ class ObservationScreen(QWidget):
 
         row.mousePressEvent = lambda e, c=clip: self._seek_to_clip(c)
         row.mouseDoubleClickEvent = lambda e, c=clip: self._edit_clip(c)
-        return row
+        return row, pres_ind
 
     def _seek_to_clip(self, clip: Clip):
         """Seek video to clip timestamp. Switch source if needed."""
@@ -945,7 +1035,7 @@ class FullscreenObserver(QDialog):
         shdr.setStyleSheet("background:transparent; border:none;")
         sh = QHBoxLayout(shdr)
         sh.setContentsMargins(14, 0, 10, 0)
-        lbl = QLabel("BOTONES")
+        lbl = QLabel(_("BOTONES"))
         lbl.setStyleSheet(f"color:{ACCENT}; font-size:{fs(9)}px; font-weight:700; letter-spacing:2px;")
         sh.addWidget(lbl)
         sl.addWidget(shdr)
@@ -1265,7 +1355,7 @@ class ButtonConfigDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Configurar botones")
+        self.setWindowTitle(_("Configurar botones"))
         self.setMinimumWidth(560)
         self.setModal(True)
         from utils.theme_helpers import BG1, BG0, TEXT0
@@ -1282,11 +1372,11 @@ class ButtonConfigDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(14)
 
-        title = QLabel("Configurar botones")
+        title = QLabel(_("Configurar botones"))
         title.setStyleSheet(f"color:{TEXT0}; font-size:{fs(14)}px; font-weight:700;")
         layout.addWidget(title)
 
-        subtitle = QLabel("Pad: tiempo antes/después del click  ·  Hotkey: tecla para registrar sin mouse")
+        subtitle = QLabel(_("Pad: tiempo antes/después del click  ·  Hotkey: tecla para registrar sin mouse"))
         subtitle.setStyleSheet(f"color:{TEXT3}; font-size:{fs(11)}px;")
         layout.addWidget(subtitle)
 
@@ -1295,7 +1385,7 @@ class ButtonConfigDialog(QDialog):
         hdr.setStyleSheet(f"background:transparent; border-bottom:1px solid rgba(255,255,255,0.06);")
         hh = QHBoxLayout(hdr)
         hh.setContentsMargins(0, 0, 0, 6)
-        for text, w in [("BOTÓN", 140), ("COLOR", 100), ("ANTES (s)", 80), ("DESPUÉS (s)", 80), ("HOTKEY", 70)]:
+        for text, w in [(_("BOTÓN"), 140), (_("COLOR"), 100), (_("ANTES (s)"), 80), (_("DESPUÉS (s)"), 80), (_("HOTKEY"), 70)]:
             l = QLabel(text)
             l.setFixedWidth(w)
             l.setStyleSheet(f"color:{ACCENT}; font-size:{fs(9)}px; font-weight:700; letter-spacing:1.5px;")
@@ -1328,7 +1418,7 @@ class ButtonConfigDialog(QDialog):
 
         btns = QHBoxLayout()
         btns.addStretch()
-        close_btn = QPushButton("Listo")
+        close_btn = QPushButton(_("Listo"))
         close_btn.setStyleSheet(
             f"QPushButton {{ background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
             f"stop:0 {ACCENT3},stop:1 {ACCENT2}); color:#1a1714; border:none;"
@@ -1376,7 +1466,7 @@ class ButtonConfigDialog(QDialog):
         # Find current color or add it if custom
         current_idx = next((i for i,(h,_) in enumerate(self.BTN_COLORS) if h == btn.color), -1)
         if current_idx == -1:
-            color_combo.addItem("  Personalizado", btn.color)
+            color_combo.addItem("  " + _("Personalizado"), btn.color)
             from PySide6.QtGui import QColor
             color_combo.setItemData(color_combo.count()-1, QColor(btn.color), Qt.ItemDataRole.BackgroundRole)
             color_combo.setItemData(color_combo.count()-1, QColor("#f0ede8"), Qt.ItemDataRole.ForegroundRole)
@@ -1405,7 +1495,7 @@ class ButtonConfigDialog(QDialog):
         hotkey_input = _HotkeyInput(getattr(btn, 'hotkey', ''), self.RESERVED)
         hotkey_input.setFixedWidth(68)
         hotkey_input.setPlaceholderText("—")
-        hotkey_input.setToolTip("Escribí una tecla (no F, M, Esc, Space)")
+        hotkey_input.setToolTip(_("Escribí una tecla (no F, M, Esc, Space)"))
         hotkey_input.setStyleSheet(
             f"background:{BG2}; color:{TEXT0}; border:1.5px solid {TEXT3};"
             f" border-radius:0; padding:4px 8px; font-size:{fs(13)}px; font-weight:600;"
@@ -1446,8 +1536,8 @@ class ButtonConfigDialog(QDialog):
             if hk:
                 if hk in seen_keys:
                     from PySide6.QtWidgets import QMessageBox
-                    QMessageBox.warning(self, "Hotkey duplicada",
-                        f"La tecla '{hk}' está asignada a más de un botón.\nCambiá una antes de guardar.")
+                    QMessageBox.warning(self, _("Hotkey duplicada"),
+                        _("La tecla '{}' está asignada a más de un botón.\nCambiá una antes de guardar.").format(hk))
                     return
                 seen_keys[hk] = btn.id
 

@@ -1,5 +1,6 @@
 import os, json
 from pathlib import Path as _Path
+from utils.i18n import _
 
 def _docs_folder(sub: str = "") -> str:
     """Ruta a la carpeta PyScout en Documentos."""
@@ -113,12 +114,18 @@ class MainWindow(QMainWindow):
         tbl.addSpacing(24)
 
         self._tabs = []
-        for i, label in enumerate(["Observación", "Ajuste", "Presentación"]):
+        for i, label in enumerate([_("Observación"), _("Ajuste"), _("Presentación")]):
             btn = QPushButton(label)
             btn.setObjectName("tab_active" if i == 0 else "tab")
             btn.clicked.connect(lambda checked, idx=i: self._switch_screen(idx))
             tbl.addWidget(btn)
             self._tabs.append(btn)
+
+        for _sc_idx, _sc in enumerate(["Ctrl+1", "Ctrl+2", "Ctrl+3"]):
+            _sc_action = QAction(self)
+            _sc_action.setShortcut(QKeySequence(_sc))
+            _sc_action.triggered.connect(lambda checked, i=_sc_idx: self._switch_screen(i))
+            self.addAction(_sc_action)
 
         tbl.addStretch()
 
@@ -131,13 +138,13 @@ class MainWindow(QMainWindow):
             f" font-size:{fs(12)}px; padding:4px 8px; }}"
             f"QPushButton:hover {{ color:{ACCENT}; }}"
             f"QPushButton:disabled {{ color:{BG3}; }}")
-        self._undo_btn = QPushButton("↩ Deshacer")
+        self._undo_btn = QPushButton(_("↩ Deshacer"))
         self._undo_btn.setStyleSheet(_undo_redo_style)
         self._undo_btn.setEnabled(False)
         self._undo_btn.clicked.connect(state.undo)
         tbl.addWidget(self._undo_btn)
 
-        self._redo_btn = QPushButton("Rehacer ↪")
+        self._redo_btn = QPushButton(_("Rehacer ↪"))
         self._redo_btn.setStyleSheet(_undo_redo_style)
         self._redo_btn.setEnabled(False)
         self._redo_btn.clicked.connect(state.redo)
@@ -181,40 +188,50 @@ class MainWindow(QMainWindow):
             QMenu::indicator {{ width: 16px; height: 16px; margin-left: 4px; }}
             QMenu::indicator:checked {{ color: {ACCENT}; }}""")
 
-        m_archivo = mb.addMenu("Archivo")
-        m_archivo.addAction(self._act("Nuevo proyecto", self._new_project, "Ctrl+N"))
+        m_archivo = mb.addMenu(_("Archivo"))
+        m_archivo.addAction(self._act(_("Nuevo proyecto"), self._new_project, "Ctrl+N"))
         m_archivo.addSeparator()
-        m_archivo.addAction(self._act("Abrir proyecto...", self._load_project, "Ctrl+O"))
-        self._recent_menu = m_archivo.addMenu("Recientes")
+        m_archivo.addAction(self._act(_("Abrir proyecto..."), self._load_project, "Ctrl+O"))
+        self._recent_menu = m_archivo.addMenu(_("Recientes"))
         self._rebuild_recent_menu()
         m_archivo.addSeparator()
-        m_archivo.addAction(self._act("Guardar", self._save_project, "Ctrl+S"))
-        m_archivo.addAction(self._act("Guardar como...", self._save_project_as, "Ctrl+Shift+S"))
+        m_archivo.addAction(self._act(_("Guardar"), self._save_project, "Ctrl+S"))
+        m_archivo.addAction(self._act(_("Guardar como..."), self._save_project_as, "Ctrl+Shift+S"))
 
-        m_opciones = mb.addMenu("Opciones")
-        self._act_autosave = QAction("Activar autoguardado", self)
+        m_opciones = mb.addMenu(_("Opciones"))
+        self._act_autosave = QAction(_("Activar autoguardado"), self)
         self._act_autosave.setCheckable(True)
         self._act_autosave.setChecked(True)
         self._act_autosave.triggered.connect(self._toggle_autosave)
         m_opciones.addAction(self._act_autosave)
         m_opciones.addSeparator()
 
-        self._act_mute_all = QAction("Silenciar todos los videos", self)
+        self._act_mute_all = QAction(_("Silenciar todos los videos"), self)
         self._act_mute_all.setCheckable(True)
         self._act_mute_all.setChecked(False)
-        self._act_mute_all.setToolTip("Silencia todos los reproductores abiertos y futuros")
         self._act_mute_all.triggered.connect(self._toggle_mute_all)
         m_opciones.addAction(self._act_mute_all)
 
-        self._act_mute_export = QAction("Silenciar video final por defecto", self)
+        self._act_mute_export = QAction(_("Silenciar video final por defecto"), self)
         self._act_mute_export.setCheckable(True)
         self._act_mute_export.setChecked(False)
         m_opciones.addAction(self._act_mute_export)
         m_opciones.addSeparator()
         m_opciones.addSeparator()
 
-        m_font = m_opciones.addMenu("Tamaño del texto")
-        for label, scale in [("Normal (100%)", 1.0), ("Grande (150%)", 1.5), ("Muy grande (200%)", 2.0)]:
+        m_lang = m_opciones.addMenu(_("Idioma"))
+        from utils.i18n import current_language
+        for lang_code, lang_label in [("es", "Español"), ("en", "English")]:
+            a = QAction(lang_label, self)
+            a.setCheckable(True)
+            a.setChecked(lang_code == current_language())
+            a.triggered.connect(lambda checked, lc=lang_code: self._set_language(lc))
+            m_lang.addAction(a)
+        self._lang_actions = m_lang.actions()
+        m_opciones.addSeparator()
+
+        m_font = m_opciones.addMenu(_("Tamaño del texto"))
+        for label, scale in [(_("Normal (100%)"), 1.0), (_("Grande (150%)"), 1.5), (_("Muy grande (200%)"), 2.0)]:
             a = QAction(label, self)
             a.setCheckable(True)
             a.setChecked(scale == 1.0)
@@ -222,29 +239,29 @@ class MainWindow(QMainWindow):
             m_font.addAction(a)
         self._font_scale_actions = m_font.actions()
 
-        m_botonera = mb.addMenu("Botonera")
-        m_botonera.addAction(self._act("Nueva botonera", self._new_buttons))
+        m_botonera = mb.addMenu(_("Botonera"))
+        m_botonera.addAction(self._act(_("Nueva botonera"), self._new_buttons))
         m_botonera.addSeparator()
-        m_botonera.addAction(self._act("Abrir botonera...", self._load_buttons))
-        m_botonera.addAction(self._act("Guardar botonera...", self._save_buttons))
+        m_botonera.addAction(self._act(_("Abrir botonera..."), self._load_buttons))
+        m_botonera.addAction(self._act(_("Guardar botonera..."), self._save_buttons))
 
-        m_ventana = mb.addMenu("Ventana")
-        self._act_fullscreen = QAction("Pantalla completa", self)
+        m_ventana = mb.addMenu(_("Ventana"))
+        self._act_fullscreen = QAction(_("Pantalla completa"), self)
         self._act_fullscreen.setCheckable(True)
         self._act_fullscreen.setShortcut(QKeySequence("F11"))
         self._act_fullscreen.triggered.connect(self._toggle_window_fullscreen)
         m_ventana.addAction(self._act_fullscreen)
         m_ventana.addSeparator()
-        m_ventana.addAction(self._act("Restaurar disposición", self._restore_layout))
+        m_ventana.addAction(self._act(_("Restaurar disposición"), self._restore_layout))
 
-        m_config = mb.addMenu("Configuraciones")
-        m_config.addAction(self._act("Buscar actualizaciones", self._check_updates))
-        m_config.addAction(self._act("Instalar códecs", self._install_codecs))
+        m_config = mb.addMenu(_("Configuraciones"))
+        m_config.addAction(self._act(_("Buscar actualizaciones"), self._check_updates))
+        m_config.addAction(self._act(_("Instalar códecs"), self._install_codecs))
 
-        m_help = mb.addMenu("Ayuda")
-        m_help.addAction(self._act("¿Cómo funciona?", self._show_help))
+        m_help = mb.addMenu(_("Ayuda"))
+        m_help.addAction(self._act(_("¿Cómo funciona?"), self._show_help))
         m_help.addSeparator()
-        m_help.addAction(self._act("Acerca de PyScout", self._show_about))
+        m_help.addAction(self._act(_("Acerca de PyScout"), self._show_about))
         self.setMenuBar(mb)
 
     def _act(self, label, slot, shortcut=None):
@@ -336,7 +353,7 @@ class MainWindow(QMainWindow):
         state.global_mute = checked
         state.global_mute_changed.emit(checked)
         state.toast_requested.emit(
-            "Modo silencio activado" if checked else "Audio activado")
+            _("Modo silencio activado") if checked else _("Audio activado"))
 
     def _set_font_scale(self, scale):
         self._font_scale = scale
@@ -347,7 +364,15 @@ class MainWindow(QMainWindow):
         self._apply_titlebar_style()
         for a in self._font_scale_actions:
             a.setChecked(str(int(scale*100)) in a.text())
-        state.toast_requested.emit(f"Escala: {int(scale*100)}%")
+        state.toast_requested.emit(_("Escala: {}%").format(int(scale*100)))
+
+    def _set_language(self, lang_code: str):
+        from utils.i18n import save_language
+        save_language(lang_code)
+        for a in self._lang_actions:
+            a.setChecked(a.text() in {"Español": "es", "English": "en"} and
+                         {"Español": "es", "English": "en"}[a.text()] == lang_code)
+        state.toast_requested.emit(_("Reiniciá la app para aplicar el idioma"))
 
     def _reset_prefs(self):
         from styles.theme import set_font_scale
@@ -358,26 +383,26 @@ class MainWindow(QMainWindow):
         QApplication.instance().setStyleSheet(build_style())
         self._rebuild_screens()
         self._apply_titlebar_style()
-        state.toast_requested.emit("Preferencias restablecidas")
+        state.toast_requested.emit(_("Preferencias restablecidas"))
 
     # ── Proyecto ─────────────────────────────────────────────────────────────
     def _new_project(self):
         """Nuevo proyecto desde menú Archivo — pide nombre y crea archivo."""
         if state.clips or state.buttons or state.presentation:
             dlg = QMessageBox(self)
-            dlg.setWindowTitle("Nuevo proyecto")
-            dlg.setText("¿Guardás el proyecto actual?")
-            s = dlg.addButton("Guardar", QMessageBox.ButtonRole.AcceptRole)
-            dlg.addButton("Sin guardar", QMessageBox.ButtonRole.DestructiveRole)
-            c = dlg.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+            dlg.setWindowTitle(_("Nuevo proyecto"))
+            dlg.setText(_("¿Guardás el proyecto actual?"))
+            s = dlg.addButton(_("Guardar"), QMessageBox.ButtonRole.AcceptRole)
+            dlg.addButton(_("Sin guardar"), QMessageBox.ButtonRole.DestructiveRole)
+            c = dlg.addButton(_("Cancelar"), QMessageBox.ButtonRole.RejectRole)
             dlg.exec()
             if dlg.clickedButton() == c: return
             if dlg.clickedButton() == s: self._save_project()
 
         # Modal para nombre
         from PySide6.QtWidgets import QDialog, QInputDialog
-        name, ok = QInputDialog.getText(self, "Nuevo proyecto", "Nombre del proyecto:",
-                                        text="Sin título")
+        name, ok = QInputDialog.getText(self, _("Nuevo proyecto"), _("Nombre del proyecto:"),
+                                        text=_("Sin título"))
         if not ok or not name.strip():
             return
         name = name.strip()
@@ -399,7 +424,7 @@ class MainWindow(QMainWindow):
             self._save_project_as()
             return
         if state.save_to_file(current):
-            state.toast_requested.emit("Guardado")
+            state.toast_requested.emit(_("Guardado"))
 
     @property
     def _current_path(self):
@@ -411,7 +436,7 @@ class MainWindow(QMainWindow):
         self._autosave_path = ""
 
     def _save_project_as(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Guardar proyecto",
+        path, _ = QFileDialog.getSaveFileName(self, _("Guardar proyecto"),
             os.path.join(_docs_folder("Proyectos"), f"{state.project_name}.scout"),
             filter="Scout Project (*.scout)")
         if not path: return
@@ -421,10 +446,10 @@ class MainWindow(QMainWindow):
             state.project_name = name
             self._project_lbl.setText(name)
             self._add_to_recents(path)
-            state.toast_requested.emit(f'"{name}" guardado')
+            state.toast_requested.emit(_('"{}" guardado').format(name))
 
     def _load_project(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Abrir proyecto",
+        path, _ = QFileDialog.getOpenFileName(self, _("Abrir proyecto"),
             _docs_folder("Proyectos"), filter="Scout Project (*.scout)")
         if not path: return
         self._load_project_path(path)
@@ -445,7 +470,7 @@ class MainWindow(QMainWindow):
                 state.project_name = name
                 self._project_lbl.setText(name)
                 self._add_to_recents(path)
-                state.toast_requested.emit(f'"{name}" cargado')
+                state.toast_requested.emit(_('"{}" cargado').format(name))
         else:
             # ── Crear nuevo ───────────────────────────────────────────
             self._create_new_project(path)
@@ -457,6 +482,7 @@ class MainWindow(QMainWindow):
             for attr in ("buttons", "video_sources", "clips", "presentation"):
                 getattr(state, attr).clear()
             state.presentations = [[]]
+            state.presentation_names = []
             state.active_pres_idx = 0
             state.active_source_idx = -1
         finally:
@@ -481,24 +507,24 @@ class MainWindow(QMainWindow):
             sig.emit()
         state.active_source_changed.emit("", "")
         state.project_changed.emit(name)
-        state.toast_requested.emit(f'Proyecto "{name}" creado')
+        state.toast_requested.emit(_('Proyecto "{}" creado').format(name))
 
     # ── Botonera ──────────────────────────────────────────────────────────────
     def _new_buttons(self):
         if state.buttons:
             dlg = QMessageBox(self)
-            dlg.setWindowTitle("Nueva botonera")
-            dlg.setText(f"Esto eliminará los {len(state.buttons)} botones actuales.")
-            ok = dlg.addButton("Continuar", QMessageBox.ButtonRole.DestructiveRole)
-            can = dlg.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+            dlg.setWindowTitle(_("Nueva botonera"))
+            dlg.setText(_("Esto eliminará los {} botones actuales.").format(len(state.buttons)))
+            ok = dlg.addButton(_("Continuar"), QMessageBox.ButtonRole.DestructiveRole)
+            can = dlg.addButton(_("Cancelar"), QMessageBox.ButtonRole.RejectRole)
             dlg.exec()
             if dlg.clickedButton() == can: return
         state.buttons.clear()
         state.buttons_changed.emit()
-        state.toast_requested.emit("Botonera vacía")
+        state.toast_requested.emit(_("Botonera vacía"))
 
     def _save_buttons(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Guardar botonera",
+        path, _ = QFileDialog.getSaveFileName(self, _("Guardar botonera"),
             os.path.join(_docs_folder("Botoneras"), "botonera.scoutbtn"),
             filter="Scout Botonera (*.scoutbtn)")
         if not path: return
@@ -510,12 +536,12 @@ class MainWindow(QMainWindow):
                                 "pad_after":getattr(b,'pad_after',-1),
                                 "hotkey":getattr(b,'hotkey','')}
                                for b in state.buttons]}, f, indent=2)
-            state.toast_requested.emit(f'Botonera guardada ({len(state.buttons)} botones)')
+            state.toast_requested.emit(_("Botonera guardada ({} botones)").format(len(state.buttons)))
         except Exception as e:
             state.toast_requested.emit(f"Error: {e}")
 
     def _load_buttons(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Abrir botonera",
+        path, _ = QFileDialog.getOpenFileName(self, _("Abrir botonera"),
             _docs_folder("Botoneras"),
             filter="Scout Botonera (*.scoutbtn);;JSON (*.json)")
         if not path: return
@@ -525,14 +551,14 @@ class MainWindow(QMainWindow):
                 data = json.load(f)
             buttons = data.get("buttons", [])
             if not buttons:
-                state.toast_requested.emit("Botonera vacía"); return
+                state.toast_requested.emit(_("Botonera vacía")); return
             if state.buttons:
                 dlg = QMessageBox(self)
-                dlg.setWindowTitle("Abrir botonera")
-                dlg.setText(f"Ya tenés {len(state.buttons)} botones. ¿Reemplazar o agregar?")
-                rep = dlg.addButton("Reemplazar", QMessageBox.ButtonRole.DestructiveRole)
-                dlg.addButton("Agregar", QMessageBox.ButtonRole.AcceptRole)
-                can = dlg.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+                dlg.setWindowTitle(_("Abrir botonera"))
+                dlg.setText(_("Ya tenés {} botones. ¿Reemplazar o agregar?").format(len(state.buttons)))
+                rep = dlg.addButton(_("Reemplazar"), QMessageBox.ButtonRole.DestructiveRole)
+                dlg.addButton(_("Agregar"), QMessageBox.ButtonRole.AcceptRole)
+                can = dlg.addButton(_("Cancelar"), QMessageBox.ButtonRole.RejectRole)
                 dlg.exec()
                 if dlg.clickedButton() == can: return
                 if dlg.clickedButton() == rep:
@@ -545,7 +571,7 @@ class MainWindow(QMainWindow):
                     btn.pad_before = bd.get("pad_before", -1)
                     btn.pad_after = bd.get("pad_after", -1)
                     btn.hotkey = bd.get("hotkey", "")
-            state.toast_requested.emit(f'{len(buttons)} botones cargados')
+            state.toast_requested.emit(_("{} botones cargados").format(len(buttons)))
         except Exception as e:
             state.toast_requested.emit(f"Error: {e}")
         finally:
@@ -562,43 +588,43 @@ class MainWindow(QMainWindow):
         try:
             import requests
             from utils.updater import CURRENT_VERSION, UPDATE_URL, UpdateChecker
-            self._toast.show_message("Buscando actualizaciones...")
+            self._toast.show_message(_("Buscando actualizaciones..."))
             try:
                 r = requests.get(UPDATE_URL, timeout=5)
             except Exception:
-                self._toast.show_message("Sin conexión a internet")
+                self._toast.show_message(_("Sin conexión a internet"))
                 return
             if r.status_code == 404:
-                self._toast.show_message(f"Estás al día (v{CURRENT_VERSION})")
+                self._toast.show_message(_("Estás al día (v{})").format(CURRENT_VERSION))
                 return
             if r.status_code != 200:
-                self._toast.show_message(f"Servidor no disponible (HTTP {r.status_code})")
+                self._toast.show_message(_("Servidor no disponible (HTTP {})").format(r.status_code))
                 return
             data = r.json()
             latest = data.get("version", CURRENT_VERSION)
             download_url = data.get("download_url", "")
             changelog = data.get("changelog", "")
             if not UpdateChecker._is_newer(latest, CURRENT_VERSION):
-                self._toast.show_message(f"Estás al día (v{CURRENT_VERSION})")
+                self._toast.show_message(_("Estás al día (v{})").format(CURRENT_VERSION))
                 return
             # Nueva versión disponible
             if not download_url:
-                QMessageBox.information(self, "Actualización disponible",
+                QMessageBox.information(self, _("Actualización disponible"),
                     f"Nueva versión: {latest}\nTu versión: {CURRENT_VERSION}\n\n"
                     f"{changelog or 'Visitá la página para descargar.'}")
                 return
             msg = QMessageBox(self)
-            msg.setWindowTitle("Actualización disponible")
+            msg.setWindowTitle(_("Actualización disponible"))
             msg.setText(f"<b>PyScout {latest}</b> está disponible.<br>Versión actual: {CURRENT_VERSION}")
             if changelog:
                 msg.setInformativeText(changelog)
             msg.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
-            msg.button(QMessageBox.StandardButton.Ok).setText("Descargar y actualizar")
-            msg.button(QMessageBox.StandardButton.Cancel).setText("Más tarde")
+            msg.button(QMessageBox.StandardButton.Ok).setText(_("Descargar y actualizar"))
+            msg.button(QMessageBox.StandardButton.Cancel).setText(_("Más tarde"))
             if msg.exec() == QMessageBox.StandardButton.Ok:
                 self._download_and_apply_update(latest, download_url)
         except ImportError:
-            self._toast.show_message("Módulo de actualizaciones no disponible")
+            self._toast.show_message(_("Módulo de actualizaciones no disponible"))
         except Exception as e:
             self._toast.show_message(f"Error: {e}")
 
@@ -609,7 +635,7 @@ class MainWindow(QMainWindow):
         from utils.updater import UpdateDownloader, apply_update
 
         dlg = QDialog(self)
-        dlg.setWindowTitle(f"Descargando PyScout {version}")
+        dlg.setWindowTitle(_("Descargando PyScout {}").format(version))
         dlg.setFixedWidth(420)
         dlg.setModal(True)
         dlg.setStyleSheet(f"background:{BG1}; color:{TEXT0};")
@@ -618,7 +644,7 @@ class MainWindow(QMainWindow):
         vl.setContentsMargins(28, 24, 28, 20)
         vl.setSpacing(12)
 
-        lbl_title = QLabel(f"Descargando PyScout {version}...")
+        lbl_title = QLabel(_("Descargando PyScout {}...").format(version))
         lbl_title.setStyleSheet(f"color:{TEXT0}; font-size:{fs(14)}px; font-weight:600;")
         vl.addWidget(lbl_title)
 
@@ -632,13 +658,13 @@ class MainWindow(QMainWindow):
             f"QProgressBar::chunk {{ background:{ACCENT}; border-radius:4px; }}")
         vl.addWidget(bar)
 
-        lbl_info = QLabel("Conectando...")
+        lbl_info = QLabel(_("Conectando..."))
         lbl_info.setStyleSheet(f"color:{TEXT2}; font-size:{fs(11)}px;")
         vl.addWidget(lbl_info)
 
         hl = QHBoxLayout()
         hl.addStretch()
-        btn_cancel = QPushButton("Cancelar")
+        btn_cancel = QPushButton(_("Cancelar"))
         btn_cancel.setStyleSheet(
             f"QPushButton {{ background:{BG2}; color:{TEXT1}; border:none;"
             f" border-radius:6px; padding:8px 20px; font-size:{fs(12)}px; }}"
@@ -657,16 +683,15 @@ class MainWindow(QMainWindow):
 
         def on_finished(zip_path):
             dlg.accept()
-            reply = QMessageBox.question(self, "Actualización lista",
-                f"PyScout {version} listo para instalar.\n\n"
-                "La app se cerrará y se reiniciará automáticamente.\n¿Continuar?",
+            reply = QMessageBox.question(self, _("Actualización lista"),
+                _("PyScout {} listo para instalar.\n\nLa app se cerrará y se reiniciará automáticamente.\n¿Continuar?").format(version),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.Yes:
                 apply_update(zip_path)
 
         def on_failed(err):
             dlg.reject()
-            self._toast.show_message(f"Error al descargar: {err}")
+            self._toast.show_message(_("Error al descargar: {}").format(err))
 
         downloader.progress.connect(on_progress)
         downloader.finished.connect(on_finished)
@@ -677,31 +702,107 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _install_codecs(self):
-        from PySide6.QtWidgets import QMessageBox
-        from PySide6.QtGui import QDesktopServices
-        from PySide6.QtCore import QUrl
         import subprocess
+        from PySide6.QtWidgets import QDialog, QVBoxLayout as QVL, QHBoxLayout as QHL, QLabel, QPushButton, QFrame
+        from utils.ffmpeg import get_ffmpeg
+
+        # ── Verificar FFmpeg ──────────────────────────────────────────────────
+        ffmpeg_ver = None
+        ffmpeg_path = None
         try:
-            from utils.ffmpeg import get_ffmpeg
-            result = subprocess.run([get_ffmpeg(), "-version"],
-                capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                ver = result.stdout.split('\n')[0][:60]
-                self._toast.show_message(f"Códecs OK: {ver}")
-            else:
-                raise FileNotFoundError()
+            fp = get_ffmpeg()
+            r = subprocess.run([fp, "-version"], capture_output=True, text=True, timeout=5)
+            if r.returncode == 0:
+                ffmpeg_ver = r.stdout.split('\n')[0].replace("ffmpeg version ", "").split(" ")[0]
+                ffmpeg_path = fp
         except Exception:
-            reply = QMessageBox.question(self, "Códecs no encontrados",
-                "FFmpeg no está instalado.\n"
-                "Es necesario para exportar videos.\n\n"
-                "¿Ir a la página de descarga?")
-            if reply == QMessageBox.StandardButton.Yes:
-                QDesktopServices.openUrl(QUrl("https://www.gyan.dev/ffmpeg/builds/"))
+            pass
+
+        # ── Verificar libmpv ──────────────────────────────────────────────────
+        mpv_ok = False
+        try:
+            import mpv as _mpv  # noqa: F401
+            mpv_ok = True
+        except Exception:
+            pass
+
+        # ── Dialog de estado ──────────────────────────────────────────────────
+        dlg = QDialog(self)
+        dlg.setWindowTitle(_("Estado de componentes"))
+        dlg.setFixedWidth(440)
+        dlg.setStyleSheet(f"background:{BG1}; color:{TEXT0};")
+        vl = QVL(dlg)
+        vl.setContentsMargins(28, 24, 28, 20)
+        vl.setSpacing(0)
+
+        title = QLabel(_("Componentes de video"))
+        title.setStyleSheet(f"color:{ACCENT}; font-size:{fs(14)}px; font-weight:700;")
+        vl.addWidget(title)
+        vl.addSpacing(16)
+
+        sep = QFrame(); sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background:{BORDER2};")
+        vl.addWidget(sep)
+        vl.addSpacing(14)
+
+        def _row(label: str, ok: bool, detail: str = ""):
+            row = QHL()
+            dot = QLabel("●")
+            dot.setFixedWidth(16)
+            dot.setStyleSheet(f"color:{'#27AE60' if ok else '#C0392B'}; font-size:{fs(10)}px;")
+            name = QLabel(label)
+            name.setStyleSheet(f"color:{TEXT0}; font-size:{fs(12)}px; font-weight:600;")
+            row.addWidget(dot)
+            row.addWidget(name)
+            row.addStretch()
+            if detail:
+                det = QLabel(detail)
+                det.setStyleSheet(f"color:{TEXT2}; font-size:{fs(10)}px;")
+                row.addWidget(det)
+            vl.addLayout(row)
+            if not ok:
+                warn = QLabel(_("  No encontrado — reinstalá PyScout"))
+                warn.setStyleSheet(f"color:#C0392B; font-size:{fs(10)}px;")
+                vl.addWidget(warn)
+            vl.addSpacing(10)
+
+        _row("FFmpeg  (exportar video)", ffmpeg_ver is not None,
+             f"v{ffmpeg_ver}" if ffmpeg_ver else "")
+        _row("libmpv  (reproducción)", mpv_ok,
+             _("cargado") if mpv_ok else "")
+
+        vl.addSpacing(4)
+        sep2 = QFrame(); sep2.setFixedHeight(1)
+        sep2.setStyleSheet(f"background:{BORDER2};")
+        vl.addWidget(sep2)
+        vl.addSpacing(14)
+
+        all_ok = ffmpeg_ver is not None and mpv_ok
+        summary = QLabel(_("Todos los componentes están instalados correctamente.") if all_ok
+                         else _("Algunos componentes faltan. Reinstalá PyScout para reparar."))
+        summary.setWordWrap(True)
+        summary.setStyleSheet(
+            f"color:{'#27AE60' if all_ok else '#C0392B'}; font-size:{fs(11)}px;")
+        vl.addWidget(summary)
+        vl.addSpacing(20)
+
+        btn = QPushButton(_("Cerrar"))
+        btn.setFixedHeight(34)
+        btn.setStyleSheet(
+            f"QPushButton{{background:{BG3};color:{TEXT0};border:none;"
+            f"border-radius:4px;font-size:{fs(12)}px;padding:0 20px;}}"
+            f"QPushButton:hover{{background:{ACCENT};color:#000;}}"
+        )
+        btn.clicked.connect(dlg.accept)
+        hl = QHL(); hl.addStretch(); hl.addWidget(btn)
+        vl.addLayout(hl)
+
+        dlg.exec()
 
     # ── Ayuda ─────────────────────────────────────────────────────────────────
     def _show_about(self):
         dlg = QDialog(self)
-        dlg.setWindowTitle("Acerca de PyScout")
+        dlg.setWindowTitle(_("Acerca de PyScout"))
         dlg.setFixedWidth(460)
         dlg.setStyleSheet(f"background:{BG1}; color:{TEXT0};")
         vl = QVL(dlg)
@@ -713,12 +814,12 @@ class MainWindow(QMainWindow):
             f"color:{ACCENT}; font-size:{fs(24)}px; font-weight:700; letter-spacing:-0.5px;")
         vl.addWidget(name_lbl)
 
-        tagline = QLabel("Análisis de video deportivo")
+        tagline = QLabel(_("Análisis de video deportivo"))
         tagline.setStyleSheet(f"color:{TEXT2}; font-size:{fs(12)}px;")
         vl.addWidget(tagline)
         vl.addSpacing(4)
 
-        version_lbl = QLabel("Versión 1.0")
+        version_lbl = QLabel(_("Versión 1.0"))
         version_lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(10)}px;")
         vl.addWidget(version_lbl)
         vl.addSpacing(20)
@@ -727,22 +828,22 @@ class MainWindow(QMainWindow):
         vl.addWidget(sep)
         vl.addSpacing(18)
 
-        desc = QLabel(
+        desc = QLabel(_(
             "PyScout es una herramienta para entrenadores y analistas deportivos. "
             "Marcá jugadas en tiempo real mientras mirás el partido, recortá cada clip "
             "con precisión, armá listados tácticos y producí video editado listo para presentar al equipo."
-        )
+        ))
         desc.setWordWrap(True)
         desc.setStyleSheet(f"color:{TEXT1}; font-size:{fs(12)}px;")
         vl.addWidget(desc)
         vl.addSpacing(18)
 
-        offline_lbl = QLabel("Sin conexión a internet  ·  Sin límite de proyectos  ·  Sin nube")
+        offline_lbl = QLabel(_("Sin conexión a internet  ·  Sin límite de proyectos  ·  Sin nube"))
         offline_lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(10)}px;")
         vl.addWidget(offline_lbl)
         vl.addSpacing(8)
 
-        formats_lbl = QLabel("Formatos de video:  MP4  ·  MOV  ·  MKV  ·  AVI  ·  WebM  ·  MTS")
+        formats_lbl = QLabel(_("Formatos de video:  MP4  ·  MOV  ·  MKV  ·  AVI  ·  WebM  ·  MTS"))
         formats_lbl.setStyleSheet(f"color:{TEXT2}; font-size:{fs(11)}px;")
         vl.addWidget(formats_lbl)
         vl.addSpacing(24)
@@ -751,12 +852,12 @@ class MainWindow(QMainWindow):
         vl.addWidget(sep2)
         vl.addSpacing(14)
 
-        footer_lbl = QLabel("© 2026 PyScout. Todos los derechos reservados.")
+        footer_lbl = QLabel(_("© 2026 PyScout. Todos los derechos reservados."))
         footer_lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(10)}px;")
         vl.addWidget(footer_lbl)
         vl.addSpacing(18)
 
-        close_btn = QPushButton("Cerrar")
+        close_btn = QPushButton(_("Cerrar"))
         close_btn.setStyleSheet(f"""
             QPushButton {{
                 background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
@@ -781,7 +882,7 @@ class MainWindow(QMainWindow):
         settings = QSettings("ScoutApp", "prefs")
         recents = settings.value("recent_projects", [])
         if not recents:
-            a = self._recent_menu.addAction("(vacío)")
+            a = self._recent_menu.addAction(_("(vacío)"))
             a.setEnabled(False); return
         for path in recents:
             name = os.path.basename(path).rsplit(".", 1)[0]
@@ -804,7 +905,7 @@ class MainWindow(QMainWindow):
 
     def _open_recent(self, path):
         if not os.path.exists(path):
-            state.toast_requested.emit("Archivo no encontrado")
+            state.toast_requested.emit(_("Archivo no encontrado"))
             settings = QSettings("ScoutApp", "prefs")
             recents = settings.value("recent_projects", [])
             if path in recents:
@@ -821,7 +922,7 @@ class MainWindow(QMainWindow):
             state.project_name = name
             self._project_lbl.setText(name)
             self._add_to_recents(path)
-            state.toast_requested.emit(f'"{name}" cargado')
+            state.toast_requested.emit(_('"{}" cargado').format(name))
 
     def _clear_recents(self):
         QSettings("ScoutApp", "prefs").setValue("recent_projects", [])
@@ -829,7 +930,7 @@ class MainWindow(QMainWindow):
 
     def _show_help(self):
         dlg = QDialog(self)
-        dlg.setWindowTitle("¿Cómo funciona PyScout?")
+        dlg.setWindowTitle(_("¿Cómo funciona PyScout?"))
         dlg.setMinimumSize(720, 540)
         dlg.setStyleSheet(f"background:{BG1}; color:{TEXT0};")
         root = QHL(dlg)
@@ -843,19 +944,19 @@ class MainWindow(QMainWindow):
         nl = QVL(nav)
         nl.setContentsMargins(0, 20, 0, 16)
         nl.setSpacing(0)
-        nav_title = QLabel("CONTENIDO")
+        nav_title = QLabel(_("CONTENIDO"))
         nav_title.setStyleSheet(
             f"color:{ACCENT}; font-size:{fs(9)}px; font-weight:700;"
             f" letter-spacing:2px; padding:0 16px 10px 16px;")
         nl.addWidget(nav_title)
 
         sections = [
-            ("Flujo de trabajo",  "flujo"),
-            ("1. Observación",    "obs"),
-            ("2. Ajuste",         "adj"),
-            ("3. Presentación",   "pres"),
-            ("Atajos de teclado", "keys"),
-            ("Preguntas frecuentes", "faq"),
+            (_("Flujo de trabajo"),  "flujo"),
+            (_("1. Observación"),    "obs"),
+            (_("2. Ajuste"),         "adj"),
+            (_("3. Presentación"),   "pres"),
+            (_("Atajos de teclado"), "keys"),
+            (_("Preguntas frecuentes"), "faq"),
         ]
 
         content_area = QScrollArea()
@@ -913,36 +1014,36 @@ class MainWindow(QMainWindow):
             return s
 
         # ── Flujo de trabajo ──────────────────────────────────────────────────
-        cl.addWidget(heading("Flujo de trabajo", "flujo"))
-        cl.addWidget(para(
+        cl.addWidget(heading(_("Flujo de trabajo"), "flujo"))
+        cl.addWidget(para(_(
             "PyScout te guía por tres pantallas que se encadenan naturalmente:<br><br>"
             "<b>① Observación</b> — Mirás el partido y marcás momentos clave con un clic.<br>"
             "<b>② Ajuste</b> — Revisás cada registro y afinás el inicio y fin del clip.<br>"
             "<b>③ Presentación</b> — Ordenás los clips, armás listados y producís el video final."
-        ))
+        )))
 
         # ── Observación ───────────────────────────────────────────────────────
         cl.addWidget(sep())
-        cl.addWidget(heading("1. Observación", "obs"))
-        cl.addWidget(para(
+        cl.addWidget(heading(_("1. Observación"), "obs"))
+        cl.addWidget(para(_(
             "Cargá uno o varios videos fuente con el botón <b>+</b> de la barra de pestañas "
             "(hasta 10 simultáneos). En el sidebar izquierdo creá los botones de categoría "
             "que necesitás: PNR, Transición, Tiro libre, etc."
-        ))
-        cl.addWidget(para(
+        )))
+        cl.addWidget(para(_(
             "Mientras el video corre, presioná el botón en el momento exacto. "
             "PyScout registra el clip con un margen automático antes y después del instante marcado. "
             "Podés ajustar ese margen por categoría con el ícono <b>⚙</b>, y asignar una tecla de atajo "
             "para registrar sin usar el mouse."
-        ))
-        cl.addWidget(para(
+        )))
+        cl.addWidget(para(_(
             "La lista de <b>Registros</b> en la parte inferior muestra todo lo marcado en el video activo. "
             "Clic en un registro para ir al instante; doble clic para editar nombre, nota y color."
-        ))
+        )))
 
         # ── Ajuste ────────────────────────────────────────────────────────────
         cl.addWidget(sep())
-        cl.addWidget(heading("2. Ajuste", "adj"))
+        cl.addWidget(heading(_("2. Ajuste"), "adj"))
         cl.addWidget(para(
             "El sidebar muestra todos tus registros con filtro por categoría. "
             "Seleccioná uno para cargarlo en el reproductor."
@@ -953,49 +1054,49 @@ class MainWindow(QMainWindow):
             "El playhead (línea blanca) es tu referencia de posición — los handles se pegan a él "
             "automáticamente cuando se acercan. Usá <b>🔍+ / 🔍−</b> para hacer zoom en el timeline."
         ))
-        cl.addWidget(para(
+        cl.addWidget(para(_(
             "Cuando el clip está listo, presioná <b>+ Agregar a presentación</b> "
             "para sumarlo al listado activo."
-        ))
+        )))
 
         # ── Presentación ──────────────────────────────────────────────────────
         cl.addWidget(sep())
-        cl.addWidget(heading("3. Presentación", "pres"))
-        cl.addWidget(para(
+        cl.addWidget(heading(_("3. Presentación"), "pres"))
+        cl.addWidget(para(_(
             "Cada proyecto puede tener hasta <b>5 listados independientes</b> — útil para separar "
             "ofensiva, defensiva, o distintos jugadores. Cambiá entre ellos con las pestañas del "
             "panel superior; renombrá cualquiera con doble clic."
-        ))
-        cl.addWidget(para(
+        )))
+        cl.addWidget(para(_(
             "Arrastrá las filas para reordenar los clips. Podés intercalar imágenes estáticas, "
             "configurar la transición de cada clip (corte directo o fade), y activar el overlay "
             "de nombre sobre el video."
-        ))
-        cl.addWidget(para(
+        )))
+        cl.addWidget(para(_(
             "Presioná <b>Producir presentación</b> para exportar un MP4 con todos los clips "
             "concatenados. Podés elegir resolución, calidad y si incluir audio. "
             "También podés exportar cada clip por separado."
-        ))
+        )))
 
         # ── Atajos ────────────────────────────────────────────────────────────
         cl.addWidget(sep())
-        cl.addWidget(heading("Atajos de teclado", "keys"))
+        cl.addWidget(heading(_("Atajos de teclado"), "keys"))
         shortcuts = [
-            ("Reproducción",
-             "Space  play / pausa\n"
+            (_("Reproducción"),
+             _("Space  play / pausa\n"
              "← / →  retroceder / avanzar 5 s\n"
              "↑ / ↓  avanzar / retroceder 10 s\n"
-             "Shift + ← / →  ±1 minuto"),
-            ("Ventana",
-             "F  pantalla completa (video en Observación)\n"
+             "Shift + ← / →  ±1 minuto")),
+            (_("Ventana"),
+             _("F  pantalla completa (video en Observación)\n"
              "F11  pantalla completa de la aplicación\n"
-             "M  silenciar"),
-            ("Proyecto",
-             "Ctrl+Z  deshacer\n"
+             "M  silenciar")),
+            (_("Proyecto"),
+             _("Ctrl+Z  deshacer\n"
              "Ctrl+Shift+Z  rehacer\n"
              "Ctrl+S  guardar\n"
              "Ctrl+O  abrir proyecto\n"
-             "Ctrl+N  nuevo proyecto"),
+             "Ctrl+N  nuevo proyecto")),
         ]
         for group_title, keys_text in shortcuts:
             cl.addWidget(subheading(group_title))
@@ -1003,26 +1104,26 @@ class MainWindow(QMainWindow):
 
         # ── FAQ ───────────────────────────────────────────────────────────────
         cl.addWidget(sep())
-        cl.addWidget(heading("Preguntas frecuentes", "faq"))
+        cl.addWidget(heading(_("Preguntas frecuentes"), "faq"))
         faq_items = [
-            ("¿Qué formatos de video acepta?",
-             "MP4, MOV, MKV, AVI, WebM y MTS. La mayoría de cámaras de acción, "
-             "drones y captura de pantalla generan alguno de estos formatos."),
-            ("¿Necesito conexión a internet?",
-             "No. PyScout funciona completamente offline. La única conexión que puede "
-             "necesitar es al activar o renovar la licencia."),
-            ("¿Dónde se guardan los proyectos?",
-             "En Documentos / PyScout / Proyectos. Cada proyecto es un único archivo .scout "
-             "que contiene todos tus botones, registros y listados."),
-            ("¿Puedo trabajar con varios videos del mismo partido?",
-             "Sí. Podés cargar hasta 10 videos fuente simultáneos y cambiar entre ellos "
-             "con las pestañas. Los clips de cada video quedan asociados a su fuente."),
-            ("¿Puedo deshacer cambios accidentales?",
-             "Sí. Ctrl+Z deshace y Ctrl+Shift+Z rehace. El historial cubre "
-             "registros, ajustes de clips y cambios en los listados de presentación."),
-            ("¿Qué pasa si cierro la app sin guardar?",
-             "PyScout tiene autoguardado activo por defecto. Cualquier cambio se escribe "
-             "al archivo del proyecto automáticamente, sin necesidad de guardar manualmente."),
+            (_("¿Qué formatos de video acepta?"),
+             _("MP4, MOV, MKV, AVI, WebM y MTS. La mayoría de cámaras de acción, "
+             "drones y captura de pantalla generan alguno de estos formatos.")),
+            (_("¿Necesito conexión a internet?"),
+             _("No. PyScout funciona completamente offline. La única conexión que puede "
+             "necesitar es al activar o renovar la licencia.")),
+            (_("¿Dónde se guardan los proyectos?"),
+             _("En Documentos / PyScout / Proyectos. Cada proyecto es un único archivo .scout "
+             "que contiene todos tus botones, registros y listados.")),
+            (_("¿Puedo trabajar con varios videos del mismo partido?"),
+             _("Sí. Podés cargar hasta 10 videos fuente simultáneos y cambiar entre ellos "
+             "con las pestañas. Los clips de cada video quedan asociados a su fuente.")),
+            (_("¿Puedo deshacer cambios accidentales?"),
+             _("Sí. Ctrl+Z deshace y Ctrl+Shift+Z rehace. El historial cubre "
+             "registros, ajustes de clips y cambios en los listados de presentación.")),
+            (_("¿Qué pasa si cierro la app sin guardar?"),
+             _("PyScout tiene autoguardado activo por defecto. Cualquier cambio se escribe "
+             "al archivo del proyecto automáticamente, sin necesidad de guardar manualmente.")),
         ]
         for q, a in faq_items:
             cl.addWidget(para(f"<b>{q}</b><br>{a}"))
@@ -1038,7 +1139,7 @@ class MainWindow(QMainWindow):
 
     def _toggle_autosave(self, checked):
         self._autosave_enabled = checked
-        state.toast_requested.emit("Autoguardado activado" if checked else "Autoguardado desactivado")
+        state.toast_requested.emit(_("Autoguardado activado") if checked else _("Autoguardado desactivado"))
 
     def _autosave(self):
         if not getattr(self, "_autosave_enabled", False): return
@@ -1048,7 +1149,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_current_path") and self._current_path:
             try:
                 state.save_to_file(self._current_path)
-                self._project_lbl.setToolTip("Guardado automáticamente")
+                self._project_lbl.setToolTip(_("Guardado automáticamente"))
             except Exception: pass
             return
         if not self._autosave_path:

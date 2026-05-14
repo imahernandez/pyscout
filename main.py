@@ -6,6 +6,8 @@ import sys
 import os
 import ctypes
 
+APP_VERSION = "1.0.0"
+
 # ── Rutas unificadas de recursos ─────────────────────────────────────────────
 try:
     from utils.resource_paths import (
@@ -193,6 +195,10 @@ def main():
         except Exception: pass
 
     app = QApplication(sys.argv)
+
+    from utils.i18n import detect_and_load
+    detect_and_load()
+
     splash = SplashScreen()
     splash.show()
 

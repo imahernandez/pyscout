@@ -1,5 +1,6 @@
 """components/dialogs.py — StartDialog arrastrable con licencia integrada + ClipEditDialog"""
 import os
+from utils.i18n import _
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QTextEdit, QFrame, QScrollArea, QFileDialog, QMessageBox,
@@ -39,29 +40,29 @@ class ColorDot(QWidget):
 class ClipEditDialog(QDialog):
     def __init__(self, name, note, color, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Editar clip"); self.setFixedWidth(420); self.setModal(True)
+        self.setWindowTitle(_("Editar clip")); self.setFixedWidth(420); self.setModal(True)
         self.setStyleSheet(f"background-color:{BG1}; border-radius:10px;")
         self._color = color; self._dots = []
         lo = QVBoxLayout(self); lo.setContentsMargins(20,20,20,20); lo.setSpacing(14)
-        lo.addWidget(QLabel("NOMBRE DEL CLIP", styleSheet=f"color:{TEXT3};font-size:10px;font-weight:600;letter-spacing:0.8px;"))
+        lo.addWidget(QLabel(_("NOMBRE DEL CLIP"), styleSheet=f"color:{TEXT3};font-size:10px;font-weight:600;letter-spacing:0.8px;"))
         self._name_input = QLineEdit(name)
         self._name_input.setStyleSheet(f"background:{BG2};color:#f0f0f0;border:1px solid #333;border-radius:6px;padding:8px 10px;")
         lo.addWidget(self._name_input)
-        lo.addWidget(QLabel("COLOR", styleSheet=f"color:{TEXT3};font-size:10px;font-weight:600;letter-spacing:0.8px;"))
+        lo.addWidget(QLabel(_("COLOR"), styleSheet=f"color:{TEXT3};font-size:10px;font-weight:600;letter-spacing:0.8px;"))
         cr = QHBoxLayout(); cr.setSpacing(8)
         for c in CLIP_COLORS:
             dot = ColorDot(c, selected=(c==color))
             dot.mousePressEvent = lambda e, col=c: self._select_color(col)
             cr.addWidget(dot); self._dots.append((c, dot))
         cr.addStretch(); lo.addLayout(cr)
-        lo.addWidget(QLabel("NOTA", styleSheet=f"color:{TEXT3};font-size:10px;font-weight:600;letter-spacing:0.8px;"))
+        lo.addWidget(QLabel(_("NOTA"), styleSheet=f"color:{TEXT3};font-size:10px;font-weight:600;letter-spacing:0.8px;"))
         self._note_input = QTextEdit(note); self._note_input.setFixedHeight(80)
         self._note_input.setStyleSheet(f"background:{BG2};color:#f0f0f0;border:1px solid #333;border-radius:6px;padding:8px 10px;")
-        self._note_input.setPlaceholderText("Agregar nota..."); lo.addWidget(self._note_input)
+        self._note_input.setPlaceholderText(_("Agregar nota...")); lo.addWidget(self._note_input)
         br = QHBoxLayout(); br.addStretch()
-        c = QPushButton("Cancelar"); c.setStyleSheet(f"background:{BG2};color:#888;border:1px solid #333;border-radius:6px;padding:7px 16px;")
+        c = QPushButton(_("Cancelar")); c.setStyleSheet(f"background:{BG2};color:#888;border:1px solid #333;border-radius:6px;padding:7px 16px;")
         c.clicked.connect(self.reject); br.addWidget(c)
-        s = QPushButton("Guardar"); s.setObjectName("primary"); s.clicked.connect(self.accept); br.addWidget(s)
+        s = QPushButton(_("Guardar")); s.setObjectName("primary"); s.clicked.connect(self.accept); br.addWidget(s)
         lo.addLayout(br)
     def _select_color(self, color):
         self._color = color
@@ -227,12 +228,12 @@ class StartDialog(QDialog):
 
         # Left: actions
         left = QVBoxLayout(); left.setSpacing(8)
-        self._new_btn = self._mk_btn("  Nuevo proyecto", True, self._action_new)
-        self._open_btn = self._mk_btn("  Abrir proyecto", False, self._action_open)
+        self._new_btn = self._mk_btn("  " + _("Crear proyecto"), True, self._action_new)
+        self._open_btn = self._mk_btn("  " + _("Abrir proyecto"), False, self._action_open)
         left.addWidget(self._new_btn)
         left.addWidget(self._open_btn)
         left.addSpacing(8)
-        eb = QPushButton("Salir"); eb.setFixedHeight(30); eb.setCursor(Qt.CursorShape.PointingHandCursor)
+        eb = QPushButton(_("Salir")); eb.setFixedHeight(30); eb.setCursor(Qt.CursorShape.PointingHandCursor)
         eb.setStyleSheet("QPushButton{background:transparent;border:1px solid rgba(255,255,255,0.08);border-radius:1px;color:rgba(255,255,255,0.3);font-size:11px;padding:0 12px;}"
             "QPushButton:hover{color:rgba(255,255,255,0.6);border-color:rgba(255,255,255,0.15);}")
         eb.clicked.connect(self._action_exit); left.addWidget(eb)
@@ -248,7 +249,7 @@ class StartDialog(QDialog):
 
         # Right: recents
         right = QVBoxLayout(); right.setSpacing(10)
-        r_hdr = QLabel("RECIENTES")
+        r_hdr = QLabel(_("RECIENTES"))
         r_hdr.setStyleSheet("color:rgba(201,164,74,0.6);font-size:9px;font-weight:700;letter-spacing:3px;background:transparent;")
         right.addWidget(r_hdr)
         self._scroll = QScrollArea(); self._scroll.setWidgetResizable(True)
@@ -414,7 +415,7 @@ class StartDialog(QDialog):
         self._key_input.setVisible(False)
         bl.addWidget(self._key_input)
 
-        self._act_btn = QPushButton("Activar")
+        self._act_btn = QPushButton(_("Activar"))
         self._act_btn.setFixedSize(60, 28)
         self._act_btn.setStyleSheet(f"QPushButton{{background:{ACCENT};color:#1a1714;border:none;font-size:11px;font-weight:600;border-radius:1px;}}QPushButton:hover{{background:{ACCENT3};}}QPushButton:disabled{{background:{BG3};color:{TEXT3};}}")
         self._act_btn.clicked.connect(self._do_activate)
@@ -428,13 +429,13 @@ class StartDialog(QDialog):
         self._cancel_key.setVisible(False)
         bl.addWidget(self._cancel_key)
 
-        self._show_key_btn = QPushButton("Activar licencia")
+        self._show_key_btn = QPushButton(_("Activar licencia"))
         self._show_key_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._show_key_btn.setStyleSheet(f"QPushButton{{background:transparent;color:{ACCENT};border:1px solid rgba(201,164,74,0.3);font-size:11px;padding:4px 12px;border-radius:1px;}}QPushButton:hover{{border-color:{ACCENT};color:{ACCENT3};}}")
         self._show_key_btn.clicked.connect(self._show_key)
         bl.addWidget(self._show_key_btn)
 
-        self._buy_btn = QPushButton("Comprar")
+        self._buy_btn = QPushButton(_("Comprar"))
         self._buy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._buy_btn.setStyleSheet(f"QPushButton{{background:transparent;color:{TEXT2};border:1px solid {BORDER2};font-size:11px;padding:4px 12px;border-radius:1px;}}QPushButton:hover{{color:{ACCENT};border-color:{ACCENT};}}")
         self._buy_btn.clicked.connect(self._open_buy)
@@ -447,40 +448,40 @@ class StartDialog(QDialog):
         t = self._lic_type
         r = self._lic_remaining
         if t == "pro":
-            dot, text = "#27AE60", "Licencia activa"
+            dot, text = "#27AE60", _("Licencia activa")
         elif t == "pro_offline":
             hours = max(1, r // 3600)
-            dot, text = "#E67E22", f"Pro (offline) — {hours}h de gracia"
+            dot, text = "#E67E22", _("Pro (offline) — {}h de gracia").format(hours)
         elif t == "trial":
             if r > 86400:
                 days = r // 86400
                 dot = ACCENT if days > 7 else "#E67E22" if days > 3 else "#E74C3C"
-                text = f"Prueba: {days} días restantes"
+                text = _("Prueba: {} días restantes").format(days)
             elif r > 3600:
                 hours = r // 3600
                 dot = "#E67E22"
-                text = f"Prueba: {hours}h restantes"
+                text = _("Prueba: {}h restantes").format(hours)
             elif r > 60:
                 mins = r // 60
                 dot = "#E74C3C"
-                text = f"Prueba: {mins}min restantes"
+                text = _("Prueba: {}min restantes").format(mins)
             else:
                 dot = "#E74C3C"
-                text = f"Prueba: {r}s restantes"
+                text = _("Prueba: {}s restantes").format(r)
         elif t == "grace":
-            dot, text = "#E67E22", "Período de gracia — activá tu licencia"
+            dot, text = "#E67E22", _("Período de gracia — activá tu licencia")
         elif t == "dev":
-            dot, text = "#3498DB", "Modo desarrollo"
+            dot, text = "#3498DB", _("Modo desarrollo")
         elif t == "expired":
-            dot, text = "#E74C3C", "Prueba expirada — activá tu licencia"
+            dot, text = "#E74C3C", _("Prueba expirada — activá tu licencia")
         elif t == "wrong_pc":
-            dot, text = "#E74C3C", "Licencia de otro equipo"
+            dot, text = "#E74C3C", _("Licencia de otro equipo")
         elif t == "tampered":
-            dot, text = "#E74C3C", "Reloj del sistema manipulado"
+            dot, text = "#E74C3C", _("Reloj del sistema manipulado")
         elif t == "corrupted":
-            dot, text = "#E74C3C", "Archivo de licencia dañado"
+            dot, text = "#E74C3C", _("Archivo de licencia dañado")
         else:
-            dot, text = "#E74C3C", "Sin licencia"
+            dot, text = "#E74C3C", _("Sin licencia")
 
         self._lic_label.setText(
             f'<span style="color:{dot};font-size:11px;">●</span>'
@@ -501,7 +502,7 @@ class StartDialog(QDialog):
     def _do_activate(self):
         key = self._key_input.text().strip()
         if not key:
-            QMessageBox.warning(self, "Clave vacía", "Pegá una clave de licencia válida.")
+            QMessageBox.warning(self, _("Clave vacía"), _("Pegá una clave de licencia válida."))
             return
         # Deshabilitar mientras procesa
         self._act_btn.setEnabled(False)
@@ -517,10 +518,10 @@ class StartDialog(QDialog):
         finally:
             QApplication.restoreOverrideCursor()
             self._act_btn.setEnabled(True)
-            self._act_btn.setText("Activar")
+            self._act_btn.setText(_("Activar"))
 
         if ok:
-            QMessageBox.information(self, "Activado", msg)
+            QMessageBox.information(self, _("Activado"), msg)
             # Recargar estado desde disco
             self._load_license()
             self._update_license_label()
@@ -543,13 +544,13 @@ class StartDialog(QDialog):
         if self._lic_valid or self._lic_type == "dev":
             return True
         msgs = {
-            "expired": "Tu período de prueba expiró. Activá una licencia para continuar.",
-            "wrong_pc": "Esta licencia pertenece a otro equipo.",
-            "tampered": "Se detectó una manipulación del reloj del sistema.",
-            "corrupted": "El archivo de licencia está dañado. Activá una licencia.",
+            "expired": _("Tu período de prueba expiró. Activá una licencia para continuar."),
+            "wrong_pc": _("Esta licencia pertenece a otro equipo."),
+            "tampered": _("Se detectó una manipulación del reloj del sistema."),
+            "corrupted": _("El archivo de licencia está dañado. Activá una licencia."),
         }
-        QMessageBox.warning(self, "Licencia requerida",
-            msgs.get(self._lic_type, "Activá tu licencia para continuar."))
+        QMessageBox.warning(self, _("Licencia requerida"),
+            msgs.get(self._lic_type, _("Activá tu licencia para continuar.")))
         return False
 
     def _action_new(self):
@@ -557,7 +558,7 @@ class StartDialog(QDialog):
 
         # Modal no-cerrable para nombre del proyecto
         dlg = QDialog(self)
-        dlg.setWindowTitle("Nuevo proyecto")
+        dlg.setWindowTitle(_("Nuevo proyecto"))
         dlg.setFixedSize(380, 160)
         dlg.setModal(True)
         # Sin botón de cerrar
@@ -568,11 +569,11 @@ class StartDialog(QDialog):
         lo.setContentsMargins(24, 20, 24, 16)
         lo.setSpacing(12)
 
-        lo.addWidget(QLabel("NOMBRE DEL PROYECTO",
+        lo.addWidget(QLabel(_("NOMBRE DEL PROYECTO"),
             styleSheet=f"color:{ACCENT};font-size:9px;font-weight:700;letter-spacing:1.5px;background:transparent;"))
 
         name_input = QLineEdit()
-        name_input.setPlaceholderText("Ej: Semifinal Liga Nacional...")
+        name_input.setPlaceholderText(_("Ej: Semifinal Liga Nacional..."))
         name_input.setStyleSheet(f"background:{BG2};color:{TEXT0};border:none;"
             f"border-bottom:2px solid {BORDER2};font-size:14px;padding:8px 10px;")
         lo.addWidget(name_input)
@@ -580,14 +581,14 @@ class StartDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
-        cancel = QPushButton("Cancelar")
+        cancel = QPushButton(_("Cancelar"))
         cancel.setStyleSheet(f"QPushButton{{background:transparent;color:{TEXT3};"
             f"border:1px solid {BORDER2};padding:7px 16px;font-size:12px;border-radius:1px;}}"
             f"QPushButton:hover{{color:{TEXT0};border-color:rgba(255,255,255,0.2);}}")
         cancel.clicked.connect(dlg.reject)
         btn_row.addWidget(cancel)
 
-        crear = QPushButton("Crear")
+        crear = QPushButton(_("Crear"))
         crear.setStyleSheet(f"QPushButton{{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
             f"stop:0 {ACCENT3},stop:1 {ACCENT});color:#1a1714;border:none;"
             f"border-bottom:2px solid {ACCENT2};padding:7px 24px;"
@@ -642,7 +643,7 @@ class StartDialog(QDialog):
 
     def _action_open(self):
         if not self._guard_license(): return
-        path, _ = QFileDialog.getOpenFileName(self, "Abrir proyecto", "",
+        path, _ = QFileDialog.getOpenFileName(self, _("Abrir proyecto"), "",
             "PyScout Project (*.scproj);;Scout Project (*.scout);;All (*)")
         if path:
             self.selected_project_path = path
@@ -656,7 +657,7 @@ class StartDialog(QDialog):
             self.project_selected.emit(path)
             self.accept()
         else:
-            QMessageBox.warning(self, "No encontrado", f"El archivo no existe:\n{path}")
+            QMessageBox.warning(self, _("No encontrado"), f"El archivo no existe:\n{path}")
             # Removerlo de recientes
             settings = QSettings("ScoutApp", "prefs")
             recents = settings.value("recent_projects", [])

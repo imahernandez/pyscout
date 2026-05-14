@@ -11,10 +11,17 @@ __pycache__/
 venv/
 env/
 
+# Backups de migración (no son código activo)
+*.pyqt6_backup
+
 # Binaries (pesados, no van en git)
 libmpv-2.dll
 ffmpeg.exe
 ffprobe.exe
+
+# Archivos de proyecto del usuario (datos, no código fuente)
+*.scout
+*.scout.tmp
 
 # Videos de prueba
 *.mp4
@@ -38,3 +45,4 @@ scoutapp_bundle.txt
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini

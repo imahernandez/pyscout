@@ -186,7 +186,7 @@ def render_presentation(
                 )
             vfilters.append(f"{vf}[v{i}]")
             if not mute_audio:
-                if has_audio(video_path):
+                if has_audio(vid_path):
                     afilters.append(
                         f"[{i}:a]aformat=sample_fmts=fltp:sample_rates=44100:"
                         f"channel_layouts=stereo[a{i}]"

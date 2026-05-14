@@ -1,3 +1,5 @@
+import warnings
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QFrame, QSizePolicy, QLineEdit, QMessageBox,
@@ -10,12 +12,14 @@ from components.timeline import ScrubBar, ClipTimeline
 from components.dialogs import ClipEditDialog
 from store.state import state, Clip
 from styles.theme import fs
+from utils.i18n import _
 from utils.theme_helpers import (
     BG0, BG1, BG2, BG3, BG4, ACCENT, ACCENT2, ACCENT3,
     DANGER, TEXT0, TEXT1, TEXT2, TEXT3, BORDER, BORDER2,
     CLIP_COLORS, FONT
 )
 from utils.time_utils import fmt_time
+from utils.i18n import _
 from icons_helper import play_icon, pause_icon, mute_icon, volume_icon
 
 ROW_EVEN = "#1a1a22"
@@ -81,7 +85,7 @@ class AdjustScreen(QWidget):
         fb.setContentsMargins(12, 2, 12, 4)
         fb.setSpacing(4)
 
-        self._filter_all_btn = QPushButton("Todo")
+        self._filter_all_btn = QPushButton(_("Todos"))
         self._filter_all_btn.setFixedHeight(22)
         self._filter_all_btn.setCheckable(True)
         self._filter_all_btn.setChecked(True)
@@ -184,7 +188,7 @@ class AdjustScreen(QWidget):
         ml.setContentsMargins(0, 0, 0, 0)
         ml.setSpacing(0)
 
-        self._empty = QLabel("\u25cb\n\nSeleccioná un clip de la lista")
+        self._empty = QLabel("\u25cb\n\n" + _("Seleccioná un clip para editar"))
         self._empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty.setStyleSheet(f"color:{TEXT3}; font-size:{fs(13)}px;")
         ml.addWidget(self._empty)
@@ -269,11 +273,11 @@ class AdjustScreen(QWidget):
         fields = QHBoxLayout()
         fields.setSpacing(10)
         self._name_input = QLineEdit()
-        self._name_input.setPlaceholderText("Nombre del clip")
+        self._name_input.setPlaceholderText(_("Nombre del clip"))
         self._name_input.editingFinished.connect(self._save_name)
         fields.addWidget(self._name_input, stretch=2)
         self._note_input = QLineEdit()
-        self._note_input.setPlaceholderText("Nota...")
+        self._note_input.setPlaceholderText(_("Nota..."))
         self._note_input.editingFinished.connect(self._save_note)
         fields.addWidget(self._note_input, stretch=2)
         bl.addLayout(fields)
@@ -312,7 +316,7 @@ class AdjustScreen(QWidget):
         bl.addWidget(tl_box)
 
         actions = QHBoxLayout()
-        add_btn = QPushButton("+ Agregar a presentación")
+        add_btn = QPushButton(_("+ Agregar a presentación"))
         add_btn.setStyleSheet(f"""
             QPushButton {{
                 background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
@@ -327,7 +331,7 @@ class AdjustScreen(QWidget):
         add_btn.clicked.connect(self._add_to_presentation)
         actions.addWidget(add_btn)
 
-        edit_btn = QPushButton("Editar detalle")
+        edit_btn = QPushButton(_("Editar detalle"))
         edit_btn.setStyleSheet(f"""
             QPushButton {{ background:transparent; color:{TEXT2}; border:none;
                 border-bottom:1px solid {BORDER2}; border-radius:1px; font-size:{fs(11)}px; padding:2px 10px; }}
@@ -336,7 +340,7 @@ class AdjustScreen(QWidget):
         edit_btn.clicked.connect(lambda: self._open_edit_dialog())
         actions.addWidget(edit_btn)
         actions.addStretch()
-        self._dur_lbl = QLabel("Duración: —")
+        self._dur_lbl = QLabel(_("Duración: —"))
         self._dur_lbl.setStyleSheet(f"color:{TEXT3}; font-size:{fs(12)}px;")
         actions.addWidget(self._dur_lbl)
         bl.addLayout(actions)
@@ -393,7 +397,7 @@ class AdjustScreen(QWidget):
             self._filter_all_btn.hide()
             self._filter_combo.blockSignals(True)
             self._filter_combo.clear()
-            self._filter_combo.addItem("Todo", None)
+            self._filter_combo.addItem(_("Todos"), None)
             for cat in cats:
                 self._filter_combo.addItem(cat, cat)
             # Restore current selection
@@ -483,6 +487,18 @@ class AdjustScreen(QWidget):
         shown = len(filtered)
         self._clips_lbl.setText(f"CLIPS ({shown}/{total})" if self._filter_cat else f"CLIPS ({total})")
 
+        # Si el clip seleccionado ya no existe (proyecto nuevo/limpiado), volver al estado vacío
+        if self._selected_clip and self._selected_clip.id not in {c.id for c in state.clips}:
+            self._selected_clip = None
+            self._loaded_video_path = ""
+            try:
+                self._video.file_loaded.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+            self._video.pause()
+            self._edit.hide()
+            self._empty.show()
+
     def _make_clip_row(self, clip: Clip, idx: int = 0) -> QWidget:
         bg = ROW_EVEN if idx % 2 == 0 else ROW_ODD
         row = QWidget()
@@ -525,7 +541,7 @@ class AdjustScreen(QWidget):
             f" font-size:{fs(14)}px; font-weight:700; padding:0; }}"
             f"QPushButton:hover {{ color:{DANGER}; }}"
         )
-        del_btn.setToolTip("Eliminar registro")
+        del_btn.setToolTip(_("Eliminar registro"))
         del_btn.clicked.connect(lambda checked, c=clip: self._confirm_delete_clip(c))
         rl.addWidget(del_btn)
 
@@ -583,11 +599,12 @@ class AdjustScreen(QWidget):
         self._edit.show()
         if clip.video_path != self._loaded_video_path:
             self._loaded_video_path = clip.video_path
-            try:
-                self._video.file_loaded.disconnect()
-            except (RuntimeError, TypeError):
-                # TypeError: señal no conectada, RuntimeError: widget destruido
-                pass
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                try:
+                    self._video.file_loaded.disconnect()
+                except Exception:
+                    pass
             self._video.file_loaded.connect(lambda: self._do_seek(clip.time_sec))
             self._video.load(clip.video_path)
         else:
@@ -646,7 +663,7 @@ class AdjustScreen(QWidget):
             state.update_clip(self._selected_clip.id, note=self._note_input.text())
 
     def _update_dur_label(self):
-        self._dur_lbl.setText(f"Duración: {self._timeline.duration:.1f}s")
+        self._dur_lbl.setText(_("Duración: {}s").format(f"{self._timeline.duration:.1f}"))
 
     def _add_to_presentation(self):
         if self._selected_clip:
@@ -667,11 +684,11 @@ class AdjustScreen(QWidget):
 
     def _confirm_delete_clip(self, clip: Clip):
         dlg = QMessageBox(self)
-        dlg.setWindowTitle("Eliminar registro")
-        dlg.setText(f"¿Eliminar \"{clip.name}\" ({clip.timestamp})?")
-        dlg.setInformativeText("Esta acción se puede deshacer con Ctrl+Z.")
-        ok = dlg.addButton("Eliminar", QMessageBox.ButtonRole.DestructiveRole)
-        dlg.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        dlg.setWindowTitle(_("Eliminar registro"))
+        dlg.setText(_('¿Eliminar "{}" ({})?').format(clip.name, clip.timestamp))
+        dlg.setInformativeText(_("Esta acción se puede deshacer con Ctrl+Z."))
+        ok = dlg.addButton(_("Eliminar"), QMessageBox.ButtonRole.DestructiveRole)
+        dlg.addButton(_("Cancelar"), QMessageBox.ButtonRole.RejectRole)
         dlg.exec()
         if dlg.clickedButton() == ok:
             if self._selected_clip and self._selected_clip.id == clip.id:

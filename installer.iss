@@ -1,5 +1,5 @@
 #define MyAppName      "PyScout"
-#define MyAppVersion   "1.0.1"
+#define MyAppVersion   "1.0.2"
 #define MyAppPublisher "PyScout"
 #define MyAppExeName   "main.exe"
 #define MyAppURL       "https://buy.polar.sh/polar_cl_sW9U1zjSOQZ7vhN4JzRPyrLJyy4q7VKz8IE6N0CQfvq"
@@ -32,7 +32,7 @@ WizardStyle=modern
 WizardImageStretch=yes
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
-ShowLanguageDialog=no
+ShowLanguageDialog=yes
 LanguageDetectionMethod=uilanguage
 
 [Languages]
@@ -44,7 +44,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "ffprobe.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
@@ -54,6 +54,19 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent unchecked
+
+[Registry]
+; Escribe el idioma elegido durante la instalación en QSettings
+Root: HKCU; Subkey: "Software\ScoutApp\prefs"; ValueType: string; ValueName: "language"; ValueData: "{code:GetAppLang}"; Flags: uninsdeletevalue
+
+[Code]
+function GetAppLang(Param: String): String;
+begin
+  if ActiveLanguage = 'english' then
+    Result := 'en'
+  else
+    Result := 'es';
+end;
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"

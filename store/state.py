@@ -336,6 +336,14 @@ class AppState(QObject):
         self._sync_active_slot()
         self.presentation_changed.emit()
 
+    def remove_pres_items(self, ids: set):
+        if not ids:
+            return
+        self.push_undo()
+        self.presentation = [p for p in self.presentation if p.id not in ids]
+        self._sync_active_slot()
+        self.presentation_changed.emit()
+
     def duplicate_pres_item(self, item_id: str):
         """Duplica un item de la presentación activa, insertándolo justo después."""
         item = next((p for p in self.presentation if p.id == item_id), None)
