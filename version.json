@@ -1,6 +1,5 @@
 {
-  "version": "1.0.2",
-  "download_url": "https://github.com/imahernandez/pyscout/releases/download/v1.0.2/PyScout-Setup.exe",
-  "changelog": "- Codecs incluidos en el instalador automaticamente\n- Dialog de estado de componentes\n- Correcciones menores"
+  "version": "1.0.3",
+  "download_url": "https://github.com/imahernandez/pyscout/releases/download/v1.0.3/PyScout-Setup.exe",
+  "changelog": "- Actualización de link de compra a precio ARS 1000"
 }
-
